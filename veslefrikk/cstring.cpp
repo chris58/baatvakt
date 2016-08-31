@@ -1,5 +1,7 @@
+#include <string.h>
 #include "cstring.h"
 
+/*
 int cstringLength(char* str){
   int l = 0;
   char c1 = str[l];
@@ -9,9 +11,9 @@ int cstringLength(char* str){
   }
   return l;
 }
-
+*/
 void cstringAppend(char* str, char c){
-	int l = cstringLength(str);
+	int l = strlen(str);
     str[l] = c;
     str[l+1] = '\0';
 }

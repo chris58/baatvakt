@@ -1,7 +1,7 @@
-	#include <Arduino.h>
-  #include "veslefrikk_library/Time.h"
+  #include <Arduino.h>
+  #include "Time.h"
   #include "cstring.h"
-  #include "veslefrikk_library/CRC32.h"
+  #include "CRC32.h"
   #define SMS_MAX 120
   
   extern const char phone_1[9];
