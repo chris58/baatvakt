@@ -1,17 +1,17 @@
 #include <CRC32.h>
-#include <Time.h>
 #include <DallasTemperature.h>
 #include <FDC1004_differential.h>
-#include <dsp.h>
 #include <OneWire.h>
+#include <Time.h>
 #include <Wire.h>
+#include <avr/wdt.h>
+#include <dsp.h>
 
+#include "HardwareLink3.h"
+#include "alarm.h"
 #include "sensor.h"
 #include "setup.h"
-#include "HardwareLink3.h"
 #include "waterlevel.h"
-#include "alarm.h"
-#include <avr/wdt.h>
 
 // Boat owner: 
 
@@ -100,9 +100,28 @@ typedef union
 void setup()
 { 
   initSystem();
+  // CST removed tcp/ip stuff  
   initModem();
+
+  //// instead we use this
+  //SIM900Power();
+//  sendSMS("93636390", "Båtvakt possibly starting");
+  //setupSMSreception();
+//  sendSMS("93636390", "Båtvakt started");
+
+
+
+  ////
+
+  Serial.println("initSensors()");
+  delay(500);
   initSensors();
+  delay(500);
+  Serial.println("initTimer()");
+  delay(500);
   initTimer();
+  delay(500);
+  Serial.println("initTimer() done");
   for(int i = 0; i < 15; i++)
     {                   
       data[i] = IMEI[i];
@@ -144,7 +163,7 @@ void loop()
       transmit_counter++;
       disableTimer();
       packData();
-      send_Package(data, data_counter);
+      // CST send_Package(data, data_counter);
       send_data=false;  
       alarmTimer();
       alarmReset();
@@ -160,6 +179,7 @@ void loop()
   }
 }
 
+// Called every second. Timer is set up in setup.cpp, initTimer()
 ISR(TIMER1_COMPA_vect){
   seconds++;
   if(seconds%TEMP_INTERVAL == 0){
@@ -180,6 +200,10 @@ ISR(TIMER1_COMPA_vect){
   if(seconds > SEND_INTERVAL){
     send_data = true;
   }
+
+  //CST
+  Serial.println("processing sms");
+  processSMS(1, true);
 }
 
 void sampleTemperatures()
@@ -202,40 +226,40 @@ void sampleTemperatures()
   temp_counter++;
 
   if(temp_counter >= TEMP_MEAN_COUNT){
-      Serial.println("Calculating mean temperatures... ");
-      temp1_mean[temp_mean_counter] = takeMeanValue(temp1_raw, temp_counter);
-      temp2_mean[temp_mean_counter] = takeMeanValue(temp2_raw, temp_counter);
-      temp3_mean[temp_mean_counter] = takeMeanValue(temp3_raw, temp_counter);
-      temp4_mean[temp_mean_counter] = takeMeanValue(temp4_raw, temp_counter);
-      Serial.print("Mean value of Temperature 1: ");
-      Serial.println(temp1_mean[temp_mean_counter]);
-      Serial.print("Mean value of Temperature 2: ");
-      Serial.println(temp2_mean[temp_mean_counter]);
-      Serial.print("Mean value of Temperature 3: ");
-      Serial.println(temp3_mean[temp_mean_counter]);
-      Serial.print("Mean value of Temperature 4: ");
-      Serial.println(temp4_mean[temp_mean_counter]);
+    Serial.println("Calculating mean temperatures... ");
+    temp1_mean[temp_mean_counter] = takeMeanValue(temp1_raw, temp_counter);
+    temp2_mean[temp_mean_counter] = takeMeanValue(temp2_raw, temp_counter);
+    temp3_mean[temp_mean_counter] = takeMeanValue(temp3_raw, temp_counter);
+    temp4_mean[temp_mean_counter] = takeMeanValue(temp4_raw, temp_counter);
+    Serial.print("Mean value of Temperature 1: ");
+    Serial.println(temp1_mean[temp_mean_counter]);
+    Serial.print("Mean value of Temperature 2: ");
+    Serial.println(temp2_mean[temp_mean_counter]);
+    Serial.print("Mean value of Temperature 3: ");
+    Serial.println(temp3_mean[temp_mean_counter]);
+    Serial.print("Mean value of Temperature 4: ");
+    Serial.println(temp4_mean[temp_mean_counter]);
 
-      checkTemp();
+    checkTemp();
 
-      temp_mean_counter++;
-      temp_counter = 0;
-    }
+    temp_mean_counter++;
+    temp_counter = 0;
+  }
 }
 
 void readShorePower()
 {
   if(battery_1[battery_counter] > 14){
-      shorepower_raw = 1;
-    }
+    shorepower_raw = 1;
+  }
   if(battery_1[battery_counter] < 14){
-      shorepower_raw = 0;
-    }
+    shorepower_raw = 0;
+  }
 
   if(shorepower_raw == 0){
-      ts_power[power_counter] = seconds;
-      power_counter++;
-    }
+    ts_power[power_counter] = seconds;
+    power_counter++;
+  }
 }
 
 void readBattery()
@@ -252,75 +276,66 @@ void readBattery()
   battery_counter++;
 }
 
+#define PUMPON 1
+#define PUMPOFF 0
 void readBilge()
 {
   bilge_1_raw = analogRead(BILGE_1);
   bilge_2_raw = analogRead(BILGE_2);
 
-  if(bilge_1_raw > 512){
-
-      bilge_buffer_1 = 1;
-    }
-  else{
-      bilge_buffer_1 = 0;  
-    }
+  bilge_buffer_1 = (bilge_1_raw > 512)? PUMPON : PUMPOFF;
 
   samplePump(pumpBuff_1, bilge_buffer_1);
 
   if(bilge_state_1 != bilge_buffer_1){
 
-      bilge_state_1 = bilge_buffer_1;
-      if(bilge_state_1){
-	  temp_sec = seconds;
-	  temp_sec |= ( 1 << 15);
-	}
-      else{
-	  temp_sec = seconds;
-	  temp_sec &= ~(1 << 15);
-	}
-      ts_bilge_1[bilge_counter_1] = temp_sec;
-      if(bilge_buffer_1 == 1){
-	  Serial.print("Bilge 1 turned on after: ");
-	  Serial.println(seconds); 
-	}
-      if(bilge_buffer_1 == 0){
-	  Serial.print("Bilge 1 turned off after: ");
-	  Serial.println(seconds); 
-	}
-      bilge_counter_1++;
+    bilge_state_1 = bilge_buffer_1;
+    if(bilge_state_1){
+      temp_sec = seconds;
+      temp_sec |= ( 1 << 15);
     }
+    else{
+      temp_sec = seconds;
+      temp_sec &= ~(1 << 15);
+    }
+    ts_bilge_1[bilge_counter_1] = temp_sec;
+    if(bilge_buffer_1 == PUMPON){
+      Serial.print("Bilge 1 turned on after: ");
+      Serial.println(seconds); 
+    }
+    if(bilge_buffer_1 == PUMPOFF){
+      Serial.print("Bilge 1 turned off after: ");
+      Serial.println(seconds); 
+    }
+    bilge_counter_1++;
+  }
 
-  if(bilge_2_raw > 512){
-      bilge_buffer_2 = 1;
-    }
-  else{
-      bilge_buffer_2 = 0;  
-    }
+  bilge_buffer_2 = (bilge_2_raw > 512)? PUMPON : PUMPOFF;
 
   //samplePump(pumpBuff_2, bilge_buffer_2);
 
   if(bilge_state_2 != bilge_buffer_2){
-      bilge_state_2 = bilge_buffer_2;
+    bilge_state_2 = bilge_buffer_2;
 
-      if(bilge_state_2){
-	  temp_sec = seconds;
-	  temp_sec |= ( 1 << 15);
-	}
-      else{
-	  temp_sec = seconds;
-	  temp_sec &= ~(1 << 15);  
-	}
-      ts_bilge_2[bilge_counter_2] = temp_sec;
-      if(bilge_buffer_2 == 1){
-	  Serial.print("Bilge 2 turned on after: ");
-	  Serial.println(seconds); 
-	}
-      if(bilge_buffer_2 == 0){
-	  Serial.print("Bilge 2 turned off after: ");
-	  Serial.println(seconds); 
-	}
-      bilge_counter_2++;
+    if(bilge_state_2){
+      temp_sec = seconds;
+      temp_sec |= ( 1 << 15);
     }
+    else{
+      temp_sec = seconds;
+      temp_sec &= ~(1 << 15);  
+    }
+    ts_bilge_2[bilge_counter_2] = temp_sec;
+    if(bilge_buffer_2 == 1){
+      Serial.print("Bilge 2 turned on after: ");
+      Serial.println(seconds); 
+    }
+    if(bilge_buffer_2 == 0){
+      Serial.print("Bilge 2 turned off after: ");
+      Serial.println(seconds); 
+    }
+    bilge_counter_2++;
+  }
 }
 
 void readLevel()
@@ -339,19 +354,19 @@ void readLevel()
   level_counter++;
 
   if(level_counter >= LEVEL_MEAN_COUNT){
-      level_1_mean[level_mean_counter] = average(level_1, level_counter);
-      Serial.print("Water Level 1 mean: ");
-      Serial.println(level_1_mean[level_mean_counter]);
+    level_1_mean[level_mean_counter] = average(level_1, level_counter);
+    Serial.print("Water Level 1 mean: ");
+    Serial.println(level_1_mean[level_mean_counter]);
 
-      level_2_mean[level_mean_counter] = average(level_2, level_counter);
-      Serial.print("Water Level 2 mean: ");
-      Serial.println(level_2_mean[level_mean_counter]);
+    level_2_mean[level_mean_counter] = average(level_2, level_counter);
+    Serial.print("Water Level 2 mean: ");
+    Serial.println(level_2_mean[level_mean_counter]);
 
-      checkLevel();
+    checkLevel();
 
-      level_mean_counter++;
-      level_counter=0;
-    }  
+    level_mean_counter++;
+    level_counter=0;
+  }  
 }
 
 void packData()

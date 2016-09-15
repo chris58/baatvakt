@@ -17,6 +17,10 @@
 #define LEVEL_1_MAX 600
 #define LEVEL_2_MAX 600
 
+//CST
+#define PUMPON 1
+#define PUMPOFF 0
+
 #include <Arduino.h>
 #include <math.h>
 

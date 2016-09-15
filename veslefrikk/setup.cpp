@@ -7,13 +7,16 @@ uint16_t bilge_2_raw;
 uint8_t bilge_state_1;
 uint8_t bilge_state_2;
 
-void initTimer()
+void initTimerORG()
 {
   Serial.println("Startup Complete. Starting timer...");
-  Serial.println("");    
+   delay(1000);
   digitalWrite(LED0, LOW);
   digitalWrite(LED1, HIGH);
   cli();            			
+   delay(1000);
+  Serial.println("interrupts disabled");
+   delay(1000);
   TCCR1A = 0;
   TCCR1B = 0;
   OCR1A = 15624;
@@ -21,7 +24,30 @@ void initTimer()
   TCCR1B |= (1 << CS10);
   TCCR1B |= (1 << CS12);
   TIMSK1 |= (1 << OCIE1A);
-  sei();        				
+  sei();  
+  Serial.println("Timer started");
+  delay(1000);  				
+}
+
+// http://www.instructables.com/id/Arduino-Timer-Interrupts/
+// see http://www.instructables.com/id/Arduino-Timer-Interrupts/step2/Structuring-Timer-Interrupts/
+void initTimer(){
+  cli();//stop interrupts
+
+  //set timer1 interrupt at 1Hz
+  TCCR1A = 0;// set entire TCCR1A register to 0
+  TCCR1B = 0;// same for TCCR1B
+  TCNT1  = 0;//initialize counter value to 0
+  // set compare match register for 1hz increments
+  // "compare match register" = [ 16,000,000Hz/ (prescaler * "desired interrupt frequency") ] - 1
+  OCR1A = 15624;// = (16*10^6) / (1024*1) - 1 (must be <65536)
+  // turn on CTC mode
+  TCCR1B |= (1 << WGM12);
+  // Set CS12 and CS10 bits for 1024 prescaler
+  TCCR1B |= (1 << CS12) | (1 << CS10);  
+  // enable timer compare interrupt
+  TIMSK1 |= (1 << OCIE1A);
+  sei();//allow interrupts
 }
 
 void initSystem()
@@ -51,25 +77,29 @@ void disableTimer()
 
 void initModem()
 {		
-  Serial.print("Booting Modem..."); 
+  Serial.println("***************");
+  Serial.println("*Booting Modem*");
+  Serial.println("***************");
   digitalWrite(8, HIGH);
   delay(1000);
   digitalWrite(8, LOW);
   delay(20000);
 
   Serial.println("	-	Modem boot completed.");
-  Serial.print("Entering modem setup...");
+
+  // CST
+  // Serial.print("Entering modem setup...");
   	
-  if(GPRS_setup())
-    {                              
-      Serial.println("	-	Modem setup completed");   
-    }
-  else
-    {
-      Serial.println(F("Modem setup failed"));
-    }
+  // if(GPRS_setup())
+  //   {                              
+  //     Serial.println("	-	Modem setup completed");   
+  //   }
+  // else
+  //   {
+  //     Serial.println(F("Modem setup failed"));
+  //   }
   	
-  Serial.print("Signal strenght: ");
+  Serial.print("Signal strength: ");
   Serial.println(getSignalStrength());  	 
 }
 

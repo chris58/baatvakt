@@ -6,6 +6,18 @@
   
   extern const char phone_1[9];
   extern const uint8_t IMEI[15];
+
+//CST
+bool strEndsWith(char *str, char *endStr);
+void modemTest();
+void SIM900Power();
+char *readLine(char *buf, int size, HardwareSerial *port);
+int8_t sendATcommand(char* ATcommand, HardwareSerial *port, char* buf, size_t buflen, char* expectedAnswer1, char* expectedAnswer2, unsigned int timeout);
+void setupSMSreception();
+void processSMS(int nr, bool doDelete);
+  void processSMStest(int nr, bool doDelete);
+// CST
+
   
   //Confirmation from modem checks
   bool cmdOK(char* str);					//Checks for 'OK(submit)(newline)'.
