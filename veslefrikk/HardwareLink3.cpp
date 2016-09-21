@@ -1066,28 +1066,16 @@ void modemTest(){
   //Serial3.println("AT+CSTT=\“telia\”, \“\”, \“\”"); /**Start the task, based on the SIM card you are using, you need to know the APN, username and password for your service provider**/
   Serial.print("<=8 ");delay(5000);
   while(Serial3.available()) Serial.write((char) Serial3.read());
-  /* OK This response indicates task started successfully**/
-
-
-
-  //  Serial3.println("ATO"); /** switch to data mode */
-  //Serial.print("<=8a ");delay(1000);
-  //while(Serial3.available()) Serial.write((char) Serial3.read());
-
-
-
-
+  /* 'OK'  response indicates task started successfully**/
 
   Serial3.println("AT+CIICR"); /**Now bring up the wireless. Please note, the response to this might take some time**/
   Serial.print("<=9 ");delay(10000);
   while(Serial3.available()) Serial.write((char) Serial3.read());
   /*OK This text in response string indicates wireless is up**/
 
-
-
-  Serial3.println("ATO"); /** switch to data mode */
-  Serial.print("<=8a ");delay(1000);
-  while(Serial3.available()) Serial.write((char) Serial3.read());
+  // Serial3.println("ATO"); /** switch to data mode */
+  // Serial.print("<=8a ");delay(1000);
+  // while(Serial3.available()) Serial.write((char) Serial3.read());
 
 
 //  Serial3.print(F("AT+SAPBR=1,1\r\n"));	//Activate bearer profile
