@@ -7,16 +7,11 @@ uint16_t bilge_2_raw;
 uint8_t bilge_state_1;
 uint8_t bilge_state_2;
 
-void initTimerORG()
+void initTimer()
 {
-  Serial.println("Startup Complete. Starting timer...");
-   delay(1000);
-  digitalWrite(LED0, LOW);
-  digitalWrite(LED1, HIGH);
+  //Serial.println("Startup Complete. Starting timer...");
+   //delay(1000);
   cli();            			
-   delay(1000);
-  Serial.println("interrupts disabled");
-   delay(1000);
   TCCR1A = 0;
   TCCR1B = 0;
   OCR1A = 15624;
@@ -25,13 +20,13 @@ void initTimerORG()
   TCCR1B |= (1 << CS12);
   TIMSK1 |= (1 << OCIE1A);
   sei();  
-  Serial.println("Timer started");
-  delay(1000);  				
+  digitalWrite(LED0, LOW);
+  digitalWrite(LED1, HIGH);
 }
 
 // http://www.instructables.com/id/Arduino-Timer-Interrupts/
 // see http://www.instructables.com/id/Arduino-Timer-Interrupts/step2/Structuring-Timer-Interrupts/
-void initTimer(){
+void initTimerChris(){
   cli();//stop interrupts
 
   //set timer1 interrupt at 1Hz

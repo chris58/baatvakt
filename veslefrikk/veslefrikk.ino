@@ -6,12 +6,44 @@
 #include <Wire.h>
 #include <avr/wdt.h>
 #include <dsp.h>
+#include <string.h>
+#include <stdlib.h>
 
 #include "HardwareLink3.h"
 #include "alarm.h"
 #include "sensor.h"
 #include "setup.h"
 #include "waterlevel.h"
+
+
+#include "SIM900.h"
+#include <SoftwareSerial.h>
+//If not used, is better to exclude the HTTP library,
+//for RAM saving.
+//If your sketch reboots itself proprably you have finished,
+//your memory available.
+//#include "inetGSM.h"
+
+//If you want to use the Arduino functions to manage SMS, uncomment the lines below.
+#include "sms.h"
+SMSGSM sms;
+//Simple sketch to send and receive SMS.
+
+int numdata;
+boolean started=false;
+char smsbuffer[160];
+char n[20];
+
+//debug begin
+char sms_position;
+char phone_number[20]; // array for the phone number string
+char sms_text[100];
+int i;
+//debug end
+
+
+
+
 
 // Boat owner: 
 
@@ -99,84 +131,125 @@ typedef union
 
 void setup()
 { 
+
   initSystem();
   // CST removed tcp/ip stuff  
-  initModem();
+  // initModem();
 
   //// instead we use this
   //SIM900Power();
 //  sendSMS("93636390", "Båtvakt possibly starting");
   //setupSMSreception();
 //  sendSMS("93636390", "Båtvakt started");
+    //Serial connection.
+    Serial.begin(9600);
+    Serial.println("GSM Shield testing.");
+    //Start configuration of shield with baudrate.
+    //For http uses is raccomanded to use 4800 or slower.
+    if (gsm.begin(4800)) 
+    {
+        Serial.println("\nstatus=READY");
+        started=true;
+    } 
+    else 
+        Serial.println("\nstatus=IDLE");
 
 
 
-  ////
+
+  ///////////////////////////////////
 
   Serial.println("initSensors()");
   delay(500);
   initSensors();
   delay(500);
   Serial.println("initTimer()");
-  delay(500);
-  initTimer();
-  delay(500);
-  Serial.println("initTimer() done");
+//  delay(500);
+//  initTimer();
+//  delay(500);
+//  Serial.println("initTimer() done");
   for(int i = 0; i < 15; i++)
     {                   
       data[i] = IMEI[i];
     }
+
+
+    if(started) 
+    {
+        //Enable this two lines if you want to send an SMS.
+        if (sms.SendSMS("93636390", "Arduino SMS version on Veslefrikk started"))
+        Serial.println("\nSMS sent OK");
+       
+       //if NO SPACE ,you need delte SMS  from position 1 to position 20
+       //please enable this four lines
+       for(i=1;i<=20;i++)
+       {
+           sms.DeleteSMS(i);
+       }
+    }
+    
+
+  digitalWrite(LED0, LOW);
+  digitalWrite(LED1, HIGH);
+
+
+
 }
+
 
 uint32_t transmit_counter = 0;
 uint32_t reboot_limit = 100;
 void loop()
 { 
-  if(new_temp == true)
-    { 
-      sampleTemperatures();
-      new_temp = false;
-    }
-  if(new_power == true)
+  char msg[160];
+            sprintf(msg, "T1: %u\nT2: %u\nT3: %u\n T4: %u\n", 
+              temp1_raw[temp_counter-1],
+              temp2_raw[temp_counter-1],
+              temp3_raw[temp_counter-1],
+              temp4_raw[temp_counter-1]);
+              Serial.print(msg);
+              Serial.print("T1");
+              Serial.println(temp1_raw[temp_counter-1]);
+
+
+      if(started) 
     {
+        //Read if there are messages on SIM card and print them.
+        sms_position=sms.IsSMSPresent(SMS_UNREAD);
+        if (sms_position) 
+        {
+            // read new SMS
+            Serial.print("SMS postion:");
+            Serial.println(sms_position,DEC);
+            sms.GetSMS(sms_position, phone_number, sms_text, 100);
+            // now we have phone number string in phone_num
+            Serial.println(phone_number);
+            // and SMS text in sms_text
+            Serial.println(sms_text);
+            sprintf(msg, "Temperaturer\nlugar: %d\nmaskinrom: %d\nakterlugar: %d\nute: %d\n", 
+              temp1_raw[temp_counter-1],
+              temp2_raw[temp_counter-1],
+              temp3_raw[temp_counter-1],
+              temp4_raw[temp_counter-1]);
+            if (sms.SendSMS(phone_number, msg))
+              Serial.println("\nSMS sent OK");
+        }   
+        else
+        {
+            Serial.println("NO NEW SMS,WAITTING");
+        }     
+        delay(1000);
+
+      sampleTemperatures();
       readShorePower();
       new_power = false;
-    }
-  if(new_battery == true)
-    {
       readBattery();
-      new_battery = false;
-    }
-  if(new_bilge == true)
-    {
       readBilge();
-      new_bilge = false;
-    }
-  if(new_level == true)
-    {
-      readLevel();
-      new_level = false;
-    }
-
-  if(send_data == true)
-    {
-      transmit_counter++;
-      disableTimer();
-      packData();
-      // CST send_Package(data, data_counter);
-      send_data=false;  
-      alarmTimer();
-      alarmReset();
-      digitalWrite(LED0, HIGH);
-      delay(250);
-      digitalWrite(LED0, LOW);
-      resetTimer();
-      enableTimer();
-    }
 
   if (transmit_counter > reboot_limit) {
     reboot();
   }
+    }
 }
 
 // Called every second. Timer is set up in setup.cpp, initTimer()
@@ -240,7 +313,7 @@ void sampleTemperatures()
     Serial.print("Mean value of Temperature 4: ");
     Serial.println(temp4_mean[temp_mean_counter]);
 
-    checkTemp();
+    //checkTemp();
 
     temp_mean_counter++;
     temp_counter = 0;
