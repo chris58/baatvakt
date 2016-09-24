@@ -14,39 +14,37 @@
 #include "sensor.h"
 #include "setup.h"
 #include "waterlevel.h"
+#include "pump.h"
 
 
+///////////////////////
 #include "SIM900.h"
 #include <SoftwareSerial.h>
-//If not used, is better to exclude the HTTP library,
-//for RAM saving.
-//If your sketch reboots itself proprably you have finished,
-//your memory available.
-//#include "inetGSM.h"
+#include <sms.h>
 
-//If you want to use the Arduino functions to manage SMS, uncomment the lines below.
-#include "sms.h"
+
+// Modem stuff
 SMSGSM sms;
-//Simple sketch to send and receive SMS.
 
 int numdata;
 boolean started=false;
 char smsbuffer[160];
 char n[20];
 
-//debug begin
 char sms_position;
 char phone_number[20]; // array for the phone number string
 char sms_text[100];
 int i;
-//debug end
+// end Modem stuff
+// Pump stuff
 
-
-
+pumpInfo_t pumpEngine_t;
+pumpInfo_t pumpAft_t;
+pPumpInfo pumpEngine = &pumpEngine_t;
+pPumpInfo pumpAft = &pumpAft_t;
 
 
 // Boat owner: 
-
 bool new_temp = false;
 bool new_power = false;
 bool new_battery = false;
@@ -163,37 +161,61 @@ void setup()
   delay(500);
   initSensors();
   delay(500);
-  Serial.println("initTimer()");
-//  delay(500);
-//  initTimer();
-//  delay(500);
-//  Serial.println("initTimer() done");
-  for(int i = 0; i < 15; i++)
-    {                   
-      data[i] = IMEI[i];
-    }
 
+  pumpEngine->name = "Maskinrom";
+  pumpEngine->pin = PUMPENGINE_PIN;
 
-    if(started) 
-    {
-        //Enable this two lines if you want to send an SMS.
-        if (sms.SendSMS("93636390", "Arduino SMS version on Veslefrikk started"))
-        Serial.println("\nSMS sent OK");
-       
-       //if NO SPACE ,you need delte SMS  from position 1 to position 20
-       //please enable this four lines
-       for(i=1;i<=20;i++)
-       {
-           sms.DeleteSMS(i);
-       }
-    }
+  pumpAft->pin = PUMPAFT_PIN;
+  pumpAft->name = "Akterlugar";
+
+  //  Serial.println("initTimer()");
+  //  delay(500);
+  //  initTimer();
+  //  delay(500);
+  //  Serial.println("initTimer() done");
+  for(int i = 0; i < 15; i++){                   
+    data[i] = IMEI[i];
+  }
+  
+  
+  if(started) {
+    if (sms.SendSMS("93636390", "Arduino SMS version on Veslefrikk started"))
+      Serial.println("\nSMS sent OK");
     
-
+    //if NO SPACE ,you need delete SMS  from position 1 to position 20
+    //please enable this four lines
+    for(i=1;i<=20;i++)
+      {
+	sms.DeleteSMS(i);
+      }
+  }
+  
   digitalWrite(LED0, LOW);
   digitalWrite(LED1, HIGH);
+}
 
 
 
+float analogRead12V(uint16_t pin){
+  uint16_t raw = analogRead(pin);
+  //Serial.print("analogRead12V=");
+  //Serial.println(raw);
+  // Voltage devider with R1=100kOhm, R2=47kOhom
+  // Arduino uses 10bits (0..1023) for 5V.
+  float r1 = 100;
+  float r2 = 22;
+  return ((float) raw * (5.0 * (r1+r2/r2)) / 1023.0);
+}
+
+float analogRead24V(uint16_t pin){
+  uint16_t raw = analogRead(pin);
+  float r1 = 100;
+  float r2 = 22;
+  //Serial.print("analogRead24V=");
+  //Serial.println(raw);
+  // Voltage devider with R1=100kOhm, R2=22kOhom
+  // Arduino uses 10bits (0..1023) for 5V.
+  return ((float) raw * (5.0 * (r1+r2)/r2) / 1023.0);
 }
 
 
@@ -202,54 +224,63 @@ uint32_t reboot_limit = 100;
 void loop()
 { 
   char msg[160];
-            sprintf(msg, "T1: %u\nT2: %u\nT3: %u\n T4: %u\n", 
-              temp1_raw[temp_counter-1],
-              temp2_raw[temp_counter-1],
-              temp3_raw[temp_counter-1],
-              temp4_raw[temp_counter-1]);
-              Serial.print(msg);
-              Serial.print("T1");
-              Serial.println(temp1_raw[temp_counter-1]);
 
+  if(started){
+    //Read if there are messages on SIM card and print them.
+    sms_position=sms.IsSMSPresent(SMS_UNREAD);
+    if (sms_position){
+      // read new SMS
+      Serial.print("SMS postion:");
+      Serial.println(sms_position,DEC);
+      sms.GetSMS(sms_position, phone_number, sms_text, 100);
+      // now we have phone number string in phone_num
+      Serial.println(phone_number);
+      // and SMS text in sms_text
+      Serial.println(sms_text);
+      snprintf(msg, sizeof(msg), "Temps\n lugar: %+3d\n maskin: %+3d\n akter: %+3d\n ute: %+3d\n"
+	       "Batteri\n 12V: %5.2f\n 24V: %5.2f\n" 
+	       "Pump 12V is  %s\n", 
+	       "  last on for %d sec\n"
+	       "  last of for %d sec\n" 
+	       "Pump 24V is  %s\n", 
+	       "  last on for %dsec\n"
+	       "  last of for %dsec\n", 
+	       temp1_raw[temp_counter-1],
+	       temp2_raw[temp_counter-1],
+	       temp3_raw[temp_counter-1],
+	       temp4_raw[temp_counter-1],
+	       analogRead12V(BATTERY_1),
+	       analogRead24V(BATTERY_2),
+	       ((pumpEngine->status == PUMPON)? "ON" : "OFF"),
+	       (int) (pumpEngine->durationON),
+	       (int) (pumpEngine->durationOFF),
+	       ((pumpAft->status == PUMPON)? "ON" : "OFF"),
+	       (int) (pumpAft->durationON/1000.0),
+	       (int) (pumpAft->durationOFF/1000.0)
+	       );
+      Serial.print(msg);
+      //      if (sms.SendSMS(phone_number, msg))
+      //	Serial.println("\nSMS sent OK");
+    } else {
+      Serial.println("NO NEW SMS,WAITTING");
+    }     
+    delay(1000);
 
-      if(started) 
-    {
-        //Read if there are messages on SIM card and print them.
-        sms_position=sms.IsSMSPresent(SMS_UNREAD);
-        if (sms_position) 
-        {
-            // read new SMS
-            Serial.print("SMS postion:");
-            Serial.println(sms_position,DEC);
-            sms.GetSMS(sms_position, phone_number, sms_text, 100);
-            // now we have phone number string in phone_num
-            Serial.println(phone_number);
-            // and SMS text in sms_text
-            Serial.println(sms_text);
-            sprintf(msg, "Temperaturer\nlugar: %d\nmaskinrom: %d\nakterlugar: %d\nute: %d\n", 
-              temp1_raw[temp_counter-1],
-              temp2_raw[temp_counter-1],
-              temp3_raw[temp_counter-1],
-              temp4_raw[temp_counter-1]);
-            if (sms.SendSMS(phone_number, msg))
-              Serial.println("\nSMS sent OK");
-        }   
-        else
-        {
-            Serial.println("NO NEW SMS,WAITTING");
-        }     
-        delay(1000);
-
-      sampleTemperatures();
-      readShorePower();
-      new_power = false;
-      readBattery();
-      readBilge();
-
-  if (transmit_counter > reboot_limit) {
-    reboot();
-  }
+    updatePump(pumpEngine);
+    updatePump(pumpAft);
+      
+    sampleTemperatures();
+    
+    readShorePower();
+    new_power = false;
+    readBattery();
+    
+    //      readBilge();
+    
+    if (transmit_counter > reboot_limit) {
+      reboot();
     }
+  }
 }
 
 // Called every second. Timer is set up in setup.cpp, initTimer()
@@ -349,8 +380,6 @@ void readBattery()
   battery_counter++;
 }
 
-#define PUMPON 1
-#define PUMPOFF 0
 void readBilge()
 {
   bilge_1_raw = analogRead(BILGE_1);
