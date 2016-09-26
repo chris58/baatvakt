@@ -1,8 +1,15 @@
 #include "pump.h"
 
+#define DEBUGPUMP
 
 void updatePump(pPumpInfo pump){
   uint32_t now = millis();
+#ifdef DEBUGPUMP
+  Serial.print(pump->name);
+  Serial.print(" raw ");
+  Serial.println(analogRead(pump->pin));
+#endif
+
   if (analogRead(pump->pin) > 512){ // PUMPON
     if (pump->status == PUMPOFF){ // switched from off to on
       #ifdef DEBUG
@@ -26,6 +33,13 @@ void updatePump(pPumpInfo pump){
 }
 
 
+
+
+// NO NEW SMS,WAITTING
+// 12V 13.85
+// 24V 25.37
+// Maskinrom raw 678
+// Akterlugar raw 0
 
 
 

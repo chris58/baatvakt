@@ -164,9 +164,13 @@ void setup()
 
   pumpEngine->name = "Maskinrom";
   pumpEngine->pin = PUMPENGINE_PIN;
+  pumpEngine->durationON = 0;
+  pumpEngine->durationOFF = 0;
 
-  pumpAft->pin = PUMPAFT_PIN;
   pumpAft->name = "Akterlugar";
+  pumpAft->pin = PUMPAFT_PIN;
+  pumpAft->durationON = 0;
+  pumpAft->durationOFF = 0;
 
   //  Serial.println("initTimer()");
   //  delay(500);
@@ -198,33 +202,61 @@ void setup()
 
 float analogRead12V(uint16_t pin){
   uint16_t raw = analogRead(pin);
-  //Serial.print("analogRead12V=");
-  //Serial.println(raw);
+  /* Serial.print("analogRead12V="); */
+  /* Serial.println(raw); */
   // Voltage devider with R1=100kOhm, R2=47kOhom
   // Arduino uses 10bits (0..1023) for 5V.
   float r1 = 100;
-  float r2 = 22;
-  return ((float) raw * (5.0 * (r1+r2/r2)) / 1023.0);
+  float r2 = 47;
+  return ((float) raw * (5.0 * (r1+r2)/r2) / 1023.0);
 }
 
 float analogRead24V(uint16_t pin){
   uint16_t raw = analogRead(pin);
   float r1 = 100;
   float r2 = 22;
-  //Serial.print("analogRead24V=");
-  //Serial.println(raw);
+  /* Serial.print("analogRead24V="); */
+  /* Serial.println(raw); */
   // Voltage devider with R1=100kOhm, R2=22kOhom
   // Arduino uses 10bits (0..1023) for 5V.
   return ((float) raw * (5.0 * (r1+r2)/r2) / 1023.0);
 }
-
 
 uint32_t transmit_counter = 0;
 uint32_t reboot_limit = 100;
 void loop()
 { 
   char msg[160];
+  uint8_t t1 = 0;
+  uint8_t t2 = 0;
+  uint8_t t3 = 0;
+  uint8_t t4 = 0;
+  float voltage12 = 0;
+  float voltage24 = 0;
+  char voltage12S[7] = "";
+  char voltage24S[7] = "";
 
+  sensors.requestTemperatures(); 
+  t1 = sensors.getTempC(Probe1);
+  t2 = sensors.getTempC(Probe2);
+  t3 = sensors.getTempC(Probe3);
+  t4 = sensors.getTempC(Probe4);
+
+  voltage12 = analogRead12V(BATTERY_1);
+  /* 5 is mininum width, 2 is precision; float value is copied onto voltage12S*/
+  dtostrf(voltage12, 5, 2, voltage12S);
+
+  voltage24 = analogRead24V(BATTERY_2);
+  /* 5 is mininum width, 2 is precision; float value is copied onto voltage24S*/
+  dtostrf(voltage24, 5, 2, voltage24S);
+
+  Serial.print("12V "); Serial.println(voltage12);//analogRead12V(BATTERY_1));
+  Serial.print("24V "); Serial.println(voltage24);//analogRead24V(BATTERY_2));
+  
+  updatePump(pumpEngine);
+  updatePump(pumpAft);
+      
+  
   if(started){
     //Read if there are messages on SIM card and print them.
     sms_position=sms.IsSMSPresent(SMS_UNREAD);
@@ -238,42 +270,39 @@ void loop()
       // and SMS text in sms_text
       Serial.println(sms_text);
       snprintf(msg, sizeof(msg), "Temps\n lugar: %+3d\n maskin: %+3d\n akter: %+3d\n ute: %+3d\n"
-	       "Batteri\n 12V: %5.2f\n 24V: %5.2f\n" 
-	       "Pump 12V is  %s\n", 
-	       "  last on for %d sec\n"
-	       "  last of for %d sec\n" 
-	       "Pump 24V is  %s\n", 
-	       "  last on for %dsec\n"
-	       "  last of for %dsec\n", 
-	       temp1_raw[temp_counter-1],
-	       temp2_raw[temp_counter-1],
-	       temp3_raw[temp_counter-1],
-	       temp4_raw[temp_counter-1],
-	       analogRead12V(BATTERY_1),
-	       analogRead24V(BATTERY_2),
-	       ((pumpEngine->status == PUMPON)? "ON" : "OFF"),
-	       (int) (pumpEngine->durationON),
-	       (int) (pumpEngine->durationOFF),
-	       ((pumpAft->status == PUMPON)? "ON" : "OFF"),
-	       (int) (pumpAft->durationON/1000.0),
-	       (int) (pumpAft->durationOFF/1000.0)
-	       );
-      Serial.print(msg);
-      //      if (sms.SendSMS(phone_number, msg))
-      //	Serial.println("\nSMS sent OK");
+	       "Batteri\n 12V: %s\n 24V: %s\n",
+	       /* "Pump 12V is  %s\n" */
+	       /* "  last on for %d sec\n"  */
+	       /* "  last off for %d sec\n", */
+	       /* "Pump 24V is  %s\n"  */
+	       /* "  last on for %dsec\n" */
+	       /* "  last of for %dsec\n",  */
+	       (int) t1,
+	       (int) t2,
+	       (int) t3,
+	       (int) t4,
+	       voltage12S,
+	       voltage24S);
+	       /* ((pumpEngine->status == PUMPON)? "ON" : "OFF"), */
+	       /* (int) (pumpEngine->durationON), */
+	       /* (int) (pumpEngine->durationOFF)); */
+	       /* ((pumpAft->status == PUMPON)? "ON" : "OFF"), */
+	       /* (int) (pumpAft->durationON/1000.0), */
+	       /* (int) (pumpAft->durationOFF/1000.0) */
+	       /* ); */
+      //Serial.print(msg);
+      if (sms.SendSMS(phone_number, msg))
+      	Serial.println("\nSMS sent OK");
     } else {
       Serial.println("NO NEW SMS,WAITTING");
     }     
     delay(1000);
 
-    updatePump(pumpEngine);
-    updatePump(pumpAft);
-      
-    sampleTemperatures();
+    //sampleTemperatures();
     
-    readShorePower();
-    new_power = false;
-    readBattery();
+    //readShorePower();
+    //new_power = false;
+    //    readBattery();
     
     //      readBilge();
     
