@@ -266,7 +266,7 @@ bool GPRS_setup(){
   //  Serial3.print("\r\n");
   Serial.println("sent to modem");
   Serial.print("AT+CLTS=1\r\n");
-  
+   
   Serial.print("step 1: ");
   while(!cmdOK(str)){
     //s = readLine(str, 128, &Serial3); 
@@ -782,6 +782,12 @@ char* get_IP(){
   }
   return str;
 }
+
+/*
+1. AT+CLTS=1 ----> This is the AT command to enable the gsm module to get the time from the network, once the gsm module is powered on.
+2. AT+CCLK? -----> Once the first AT command is executed, this command can be executed to get the network time.
+http://www.edaboard.com/thread306862.html
+*/
 
 //Returns Unix time from SIM900
 long int get_unix_ts(){

@@ -14,8 +14,9 @@
 #include "sensor.h"
 #include "setup.h"
 #include "waterlevel.h"
-#include "pump.h"
 
+#include "pump.h"
+#include "battery.h"
 
 ///////////////////////
 #include "SIM900.h"
@@ -33,16 +34,25 @@ char n[20];
 
 char sms_position;
 char phone_number[20]; // array for the phone number string
-char sms_text[100];
+char sms_text[160];
 int i;
 // end Modem stuff
-// Pump stuff
 
+// Pump stuff
+#define PUMPENGINE_PIN 10
+#define PUMPAFT_PIN 11
 pumpInfo_t pumpEngine_t;
 pumpInfo_t pumpAft_t;
 pPumpInfo pumpEngine = &pumpEngine_t;
 pPumpInfo pumpAft = &pumpAft_t;
 
+// Battery stuff
+#define BATTERY12V_PIN 8
+#define BATTERY24V_PIN 9
+batteryInfo_t battery12V_t;
+batteryInfo_t battery24V_t;
+pBatteryInfo battery12V = &battery12V_t;
+pBatteryInfo battery24V = &battery24V_t;
 
 // Boat owner: 
 bool new_temp = false;
@@ -70,49 +80,33 @@ uint8_t bilge_buffer_2 = 0;
 uint8_t data[1024] = {
 }; 
 
-uint16_t ts_bilge_1[128] = {
-};
-uint16_t ts_bilge_2[128] = {
-};
-uint16_t ts_power[64] = {
-};
+uint16_t ts_bilge_1[128] = {};
+uint16_t ts_bilge_2[128] = {};
+uint16_t ts_power[64] = {};
 
-int16_t temp1_raw[30] = {
-};
-int16_t temp2_raw[30] = {
-};
-int16_t temp3_raw[30] = {
-};
-int16_t temp4_raw[30] = {
-};
+int16_t temp1_raw[30] = {};
+int16_t temp2_raw[30] = {};
+int16_t temp3_raw[30] = {};
+int16_t temp4_raw[30] = {};
 
-uint8_t temp1_mean[3] = {
-};
-uint8_t temp2_mean[3] = {
-};
-uint8_t temp3_mean[3] = {
-};
-uint8_t temp4_mean[3] = {
-};
+uint8_t temp1_mean[3] = {};
+uint8_t temp2_mean[3] = {};
+uint8_t temp3_mean[3] = {};
+uint8_t temp4_mean[3] = {};
+
 uint8_t shorepower_raw = 0;
-uint8_t shorepower[256] = {
-};
-uint16_t battery_1[3] = {
-};
-uint16_t battery_2[3] = {
-};
-uint8_t bilge_1[128] = {
-};
-uint8_t bilge_2[128] = {
-};
-float level_1[31] = {
-};
-float level_2[31] = {
-};
-float level_1_mean[3] = {
-};
-float level_2_mean[3] = {
-};
+uint8_t shorepower[256] = {};
+
+uint16_t battery_1[3] = {};
+uint16_t battery_2[3] = {};
+
+uint8_t bilge_1[128] = {};
+uint8_t bilge_2[128] = {};
+
+float level_1[31] = {};
+float level_2[31] = {};
+float level_1_mean[3] = {};
+float level_2_mean[3] = {};
 
 typedef union{
   float fl;		
@@ -141,19 +135,14 @@ void setup()
 //  sendSMS("93636390", "Båtvakt started");
     //Serial connection.
     Serial.begin(9600);
-    Serial.println("GSM Shield testing.");
+    Serial.println("GSM Shield init.");
     //Start configuration of shield with baudrate.
     //For http uses is raccomanded to use 4800 or slower.
-    if (gsm.begin(4800)) 
-    {
-        Serial.println("\nstatus=READY");
-        started=true;
-    } 
-    else 
-        Serial.println("\nstatus=IDLE");
-
-
-
+    if (gsm.begin(4800)){
+      Serial.println("\nstatus=READY");
+      started=true;
+    } else 
+      Serial.println("\nstatus=IDLE");
 
   ///////////////////////////////////
 
@@ -162,15 +151,15 @@ void setup()
   initSensors();
   delay(500);
 
-  pumpEngine->name = "Maskinrom";
-  pumpEngine->pin = PUMPENGINE_PIN;
-  pumpEngine->durationON = 0;
-  pumpEngine->durationOFF = 0;
+  initPump(pumpEngine, "Maskinrom", PUMPENGINE_PIN);
+  initPump(pumpAft, "Akterlugar", PUMPAFT_PIN);
 
-  pumpAft->name = "Akterlugar";
-  pumpAft->pin = PUMPAFT_PIN;
-  pumpAft->durationON = 0;
-  pumpAft->durationOFF = 0;
+  float r1 = 100.0;
+  float r2 = 47.0;
+  initBattery(battery12V, "12V Battery", BATTERY12V_PIN, (5.0 * ((r1+r2)/r2) / 1023.0));
+  r2 = 22.0;
+  initBattery(battery24V, "24V Battery", BATTERY24V_PIN, (5.0 * ((r1+r2)/r2) / 1023.0));
+
 
   //  Serial.println("initTimer()");
   //  delay(500);
@@ -183,8 +172,8 @@ void setup()
   
   
   if(started) {
-    if (sms.SendSMS("93636390", "Arduino SMS version on Veslefrikk started"))
-      Serial.println("\nSMS sent OK");
+    /* if (sms.SendSMS("93636390", "Arduino SMS version on Veslefrikk started")) */
+    /*   Serial.println("\nSMS sent OK"); */
     
     //if NO SPACE ,you need delete SMS  from position 1 to position 20
     //please enable this four lines
@@ -200,39 +189,39 @@ void setup()
 
 
 
-float analogRead12V(uint16_t pin){
-  uint16_t raw = analogRead(pin);
-  /* Serial.print("analogRead12V="); */
-  /* Serial.println(raw); */
-  // Voltage devider with R1=100kOhm, R2=47kOhom
-  // Arduino uses 10bits (0..1023) for 5V.
-  float r1 = 100;
-  float r2 = 47;
-  return ((float) raw * (5.0 * (r1+r2)/r2) / 1023.0);
-}
+/* float analogRead12V(uint16_t pin){ */
+/*   uint16_t raw = analogRead(pin); */
+/*   /\* Serial.print("analogRead12V="); *\/ */
+/*   /\* Serial.println(raw); *\/ */
+/*   // Voltage devider with R1=100kOhm, R2=47kOhom */
+/*   // Arduino uses 10bits (0..1023) for 5V. */
+/*   float r1 = 100; */
+/*   float r2 = 47; */
+/*   return ((float) raw * (5.0 * (r1+r2)/r2) / 1023.0); */
+/* } */
 
-float analogRead24V(uint16_t pin){
-  uint16_t raw = analogRead(pin);
-  float r1 = 100;
-  float r2 = 22;
-  /* Serial.print("analogRead24V="); */
-  /* Serial.println(raw); */
-  // Voltage devider with R1=100kOhm, R2=22kOhom
-  // Arduino uses 10bits (0..1023) for 5V.
-  return ((float) raw * (5.0 * (r1+r2)/r2) / 1023.0);
-}
+/* float analogRead24V(uint16_t pin){ */
+/*   uint16_t raw = analogRead(pin); */
+/*   float r1 = 100; */
+/*   float r2 = 22; */
+/*   /\* Serial.print("analogRead24V="); *\/ */
+/*   /\* Serial.println(raw); *\/ */
+/*   // Voltage devider with R1=100kOhm, R2=22kOhom */
+/*   // Arduino uses 10bits (0..1023) for 5V. */
+/*   return ((float) raw * (5.0 * (r1+r2)/r2) / 1023.0); */
+/* } */
 
 uint32_t transmit_counter = 0;
 uint32_t reboot_limit = 100;
 void loop()
 { 
-  char msg[160];
+  char msg[260];
   uint8_t t1 = 0;
   uint8_t t2 = 0;
   uint8_t t3 = 0;
   uint8_t t4 = 0;
-  float voltage12 = 0;
-  float voltage24 = 0;
+  /* float voltage12 = 0; */
+  /* float voltage24 = 0; */
   char voltage12S[7] = "";
   char voltage24S[7] = "";
 
@@ -242,57 +231,115 @@ void loop()
   t3 = sensors.getTempC(Probe3);
   t4 = sensors.getTempC(Probe4);
 
-  voltage12 = analogRead12V(BATTERY_1);
-  /* 5 is mininum width, 2 is precision; float value is copied onto voltage12S*/
-  dtostrf(voltage12, 5, 2, voltage12S);
+  /*  voltage12 = analogRead12V(BATTERY_1); */
+  /* /\* 5 is mininum width, 2 is precision; float value is copied onto voltage12S*\/ */
+  /* dtostrf(voltage12, 5, 2, voltage12S); */
 
-  voltage24 = analogRead24V(BATTERY_2);
-  /* 5 is mininum width, 2 is precision; float value is copied onto voltage24S*/
-  dtostrf(voltage24, 5, 2, voltage24S);
+  /* voltage24 = analogRead24V(BATTERY_2); */
+  /* /\* 5 is mininum width, 2 is precision; float value is copied onto voltage24S*\/ */
+  /* dtostrf(voltage24, 5, 2, voltage24S); */
 
-  Serial.print("12V "); Serial.println(voltage12);//analogRead12V(BATTERY_1));
-  Serial.print("24V "); Serial.println(voltage24);//analogRead24V(BATTERY_2));
+  /* Serial.print("12V "); Serial.println(voltage12);//analogRead12V(BATTERY_1)); */
+  /* Serial.print("24V "); Serial.println(voltage24);//analogRead24V(BATTERY_2)); */
   
   updatePump(pumpEngine);
   updatePump(pumpAft);
-      
+
+  updateBattery(battery12V);
+  updateBattery(battery24V);
+  ///////////////////////////////////////////////
+      snprintf(msg, sizeof(msg), 
+	       "Pump 12V is %s\n" 
+	       " last on for %d sec\n"  
+	       " last off for %d sec\n"
+	       "Pump 24V is %s\n"
+	       " last on for %d sec\n"
+	       " last off for %d sec\n",
+	       ((pumpEngine->status == PUMPON)? "ON" : "OFF"),
+	       (int) (pumpEngine->durationON/1000),
+	       (int) (pumpEngine->durationOFF/1000),
+	       ((pumpAft->status == PUMPON)? "ON" : "OFF"),
+	       (int) (pumpAft->durationON/1000.0),
+	       (int) (pumpAft->durationOFF/1000.0)
+	       );
+      Serial.println(msg);
+
+      snprintf(msg, sizeof(msg), "lugar: %+3d\n maskin: %+3d\n akter: %+3d\n ute: %+3d\n"
+	       "Batteri 12V: %s, 24V: %s\n",
+	       (int) t1,
+	       (int) t2,
+	       (int) t3,
+	       (int) t4,
+	       getVoltageAsString(battery12V, voltage12S),
+	       getVoltageAsString(battery24V, voltage24S)
+	       );
+      Serial.println(msg);
+
+      snprintf(msg, sizeof(msg),
+	       "Batteri 12V: %s\n"
+	       "Batteri 24V: %s\n",
+	       getVoltageAsString(battery12V, voltage12S),
+	       getVoltageAsString(battery24V, voltage24S)
+	       );
+      Serial.println(msg);
+
+  //////////////////////////////////////////////      
+
   
   if(started){
     //Read if there are messages on SIM card and print them.
     sms_position=sms.IsSMSPresent(SMS_UNREAD);
     if (sms_position){
       // read new SMS
-      Serial.print("SMS postion:");
+      Serial.print("SMS msg number: ");
       Serial.println(sms_position,DEC);
       sms.GetSMS(sms_position, phone_number, sms_text, 100);
       // now we have phone number string in phone_num
       Serial.println(phone_number);
       // and SMS text in sms_text
       Serial.println(sms_text);
-      snprintf(msg, sizeof(msg), "Temps\n lugar: %+3d\n maskin: %+3d\n akter: %+3d\n ute: %+3d\n"
-	       "Batteri\n 12V: %s\n 24V: %s\n",
-	       /* "Pump 12V is  %s\n" */
-	       /* "  last on for %d sec\n"  */
-	       /* "  last off for %d sec\n", */
-	       /* "Pump 24V is  %s\n"  */
-	       /* "  last on for %dsec\n" */
-	       /* "  last of for %dsec\n",  */
-	       (int) t1,
-	       (int) t2,
-	       (int) t3,
-	       (int) t4,
-	       voltage12S,
-	       voltage24S);
-	       /* ((pumpEngine->status == PUMPON)? "ON" : "OFF"), */
-	       /* (int) (pumpEngine->durationON), */
-	       /* (int) (pumpEngine->durationOFF)); */
-	       /* ((pumpAft->status == PUMPON)? "ON" : "OFF"), */
-	       /* (int) (pumpAft->durationON/1000.0), */
-	       /* (int) (pumpAft->durationOFF/1000.0) */
-	       /* ); */
-      //Serial.print(msg);
-      if (sms.SendSMS(phone_number, msg))
-      	Serial.println("\nSMS sent OK");
+      if (sms_text[0] == 'P' || sms_text[0] == 'p'){
+	snprintf(msg, sizeof(msg), 
+		 "Pump 12V is %s\n" 
+		 " last on for %d sec\n"  
+		 " last off for %d sec\n"
+		 "Pump 24V is %s\n"
+		 " last on for %d sec\n"
+		 " last off for %d sec\n",
+		 ((pumpEngine->status == PUMPON)? "ON" : "OFF"),
+		 (int) (pumpEngine->durationON/1000),
+		 (int) (pumpEngine->durationOFF/1000),
+		 ((pumpAft->status == PUMPON)? "ON" : "OFF"),
+		 (int) (pumpAft->durationON/1000.0),
+		 (int) (pumpAft->durationOFF/1000.0)
+		 );
+	Serial.println(msg);
+      }else if (sms_text[0] == 'T' || sms_text[0] == 't'){
+	snprintf(msg, sizeof(msg), "Temperaturer: \nlugar: %+3d\n maskin: %+3d\n akter: %+3d\n ute: %+3d\n",
+		 (int) t1,
+		 (int) t2,
+		 (int) t3,
+		 (int) t4
+		 );
+	Serial.println(msg);
+      }else if (sms_text[0] == 'B' || sms_text[0] == 'b'){
+	snprintf(msg, sizeof(msg),
+		 "Batteri 12V: %s\n"
+		 "Batteri 24V: %s\n",
+		 getVoltageAsString(battery12V, voltage12S),
+		 getVoltageAsString(battery24V, voltage24S)
+		 );
+	Serial.println(msg);
+      }else{
+	snprintf(msg, sizeof(msg), "Nice try ... ;-)\n"
+		 "Send\nT for temperatures\n"
+		 "P for pump info or\n"
+		 "B for battery info\n\nRegards\n  Baatvakta Veslefrikk");
+	Serial.println(msg);
+      }
+
+      if (sms.SendSMS(phone_number, msg)) 
+       	Serial.println("\nSMS sent OK"); 
     } else {
       Serial.println("NO NEW SMS,WAITTING");
     }     
@@ -306,9 +353,9 @@ void loop()
     
     //      readBilge();
     
-    if (transmit_counter > reboot_limit) {
-      reboot();
-    }
+    /* if (transmit_counter > reboot_limit) { */
+    /*   reboot(); */
+    /* } */
   }
 }
 

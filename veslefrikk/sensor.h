@@ -17,8 +17,8 @@
 #define TEMP_BUS 13
 #define BATTERY_1 8
 #define BATTERY_2 9
-#define BILGE_1 12
-#define BILGE_2 13
+#define BILGE_1 10  //12
+#define BILGE_2 11  //13
 #define POWER 14
 
 //Sampling period defined in seconds
