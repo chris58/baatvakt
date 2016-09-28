@@ -1,16 +1,24 @@
 #include "battery.h"
 
-pBatteryInfo initBattery(pBatteryInfo bat, char *name, uint8_t pin, float conversionFactor){
+//#define DEBUG_BATTERY
+
+pBatteryInfo initBattery(pBatteryInfo bat, char *name, uint8_t pin, float conversionFactor, float lowAlarmVoltage){
   memset(bat->name, 0, sizeof(bat->name));
   strncpy(bat->name,name, sizeof(bat->name)-1);
   bat->pin = pin;
   bat->bit2voltConversion = conversionFactor;
+  bat->lowAlarmVoltage = lowAlarmVoltage;
 
   return bat;
 }
 
 void updateBattery(pBatteryInfo bat){
   bat->raw = analogRead(bat->pin);
+#ifdef DEBUG_BATTERY
+  Serial.print(bat->name);
+  Serial.print("!!!!!!!!!!!!bat->raw=");
+  Serial.println(bat->raw);
+#endif
 }
 
 float getVoltage(pBatteryInfo bat){

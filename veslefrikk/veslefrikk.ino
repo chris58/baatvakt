@@ -156,9 +156,11 @@ void setup()
 
   float r1 = 100.0;
   float r2 = 47.0;
-  initBattery(battery12V, "12V Battery", BATTERY12V_PIN, (5.0 * ((r1+r2)/r2) / 1023.0));
+  initBattery(battery12V, "12V Battery", BATTERY12V_PIN, (13.12/844.0), 12);
+  //  initBattery(battery12V, "12V Battery", BATTERY12V_PIN, (5.0 * ((r1+r2)/r2) / 1023.0));
   r2 = 22.0;
-  initBattery(battery24V, "24V Battery", BATTERY24V_PIN, (5.0 * ((r1+r2)/r2) / 1023.0));
+  initBattery(battery24V, "24V Battery", BATTERY24V_PIN, (27.51/932.0), 24);
+  //  initBattery(battery24V, "24V Battery", BATTERY24V_PIN, (5.0 * ((r1+r2)/r2) / 1023.0));
 
 
   //  Serial.println("initTimer()");
@@ -170,13 +172,12 @@ void setup()
     data[i] = IMEI[i];
   }
   
-  
   if(started) {
-    /* if (sms.SendSMS("93636390", "Arduino SMS version on Veslefrikk started")) */
-    /*   Serial.println("\nSMS sent OK"); */
+    if (sms.SendSMS("93636390", "Arduino SMS version on Veslefrikk started")) 
+      Serial.println("\nSMS sent OK"); 
     
     //if NO SPACE ,you need delete SMS  from position 1 to position 20
-    //please enable this four lines
+    //please enable these four lines
     for(i=1;i<=20;i++)
       {
 	sms.DeleteSMS(i);
@@ -284,7 +285,7 @@ void loop()
       Serial.println(msg);
 
   //////////////////////////////////////////////      
-
+      //readLevel();
   
   if(started){
     //Read if there are messages on SIM card and print them.
@@ -340,6 +341,10 @@ void loop()
 
       if (sms.SendSMS(phone_number, msg)) 
        	Serial.println("\nSMS sent OK"); 
+      
+      // Delete the incoming sms
+      sms.DeleteSMS(sms_position);
+
     } else {
       Serial.println("NO NEW SMS,WAITTING");
     }     

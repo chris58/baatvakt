@@ -1,6 +1,6 @@
 #include "pump.h"
 
-#define DEBUGPUMP
+//#define DEBUGPUMP
 
 void updatePump(pPumpInfo pump){
   unsigned long now = millis();
