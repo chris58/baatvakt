@@ -16,6 +16,9 @@ float readLevel_1(){
     int tmp = Serial1.available()-1;
     for(int i=0; i<=tmp; i++){
       waterlevel_1[i] = Serial1.read();
+      Serial.print(i);
+      Serial.print(": ");
+      Serial.println(waterlevel_1[i]);
     }
   }
 	

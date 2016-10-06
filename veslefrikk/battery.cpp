@@ -2,7 +2,14 @@
 
 //#define DEBUG_BATTERY
 
-pBatteryInfo initBattery(pBatteryInfo bat, char *name, uint8_t pin, float conversionFactor, float lowAlarmVoltage){
+pBatteryInfo batteryInit(pBatteryInfo bi, char *name, uint8_t pin, float conversionFactor, float lowAlarmVoltage){
+  pBatteryInfo bat = bi;
+  
+  if (bat == NULL){
+    if ((bat = (pBatteryInfo) calloc(1, sizeof(batteryInfo_t))) == NULL)
+      return NULL;
+  }
+
   memset(bat->name, 0, sizeof(bat->name));
   strncpy(bat->name,name, sizeof(bat->name)-1);
   bat->pin = pin;
@@ -12,7 +19,7 @@ pBatteryInfo initBattery(pBatteryInfo bat, char *name, uint8_t pin, float conver
   return bat;
 }
 
-void updateBattery(pBatteryInfo bat){
+void batteryUpdate(pBatteryInfo bat){
   bat->raw = analogRead(bat->pin);
 #ifdef DEBUG_BATTERY
   Serial.print(bat->name);
@@ -21,13 +28,18 @@ void updateBattery(pBatteryInfo bat){
 #endif
 }
 
-float getVoltage(pBatteryInfo bat){
+float batteryGetVoltage(pBatteryInfo bat){
+  // Voltage devider:
   // float r1 = 100;
   // float r2 = 47;
   // return ((float) raw * (5.0 * (r1+r2)/r2) / 1023.0);
   return bat->raw * bat->bit2voltConversion;
 }
 
-char* getVoltageAsString(pBatteryInfo bat, char *voltageS){
-  return dtostrf(getVoltage(bat), 5, 2, voltageS);
+char* batteryGetVoltageAsString(pBatteryInfo bat, char *voltageS){
+  return dtostrf(batteryGetVoltage(bat), 5, 2, voltageS);
+}
+
+int batteryIsCharging(pBatteryInfo bat){
+  return (batteryGetVoltage(bat) >= (bat->lowAlarmVoltage + 2));
 }

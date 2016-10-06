@@ -11,9 +11,10 @@ typedef struct{
 } batteryInfo_t, *pBatteryInfo;
 
 
-pBatteryInfo initBattery(pBatteryInfo bat, char *name, uint8_t pin, float conversionFactor, float lowAlarmVoltage);
+pBatteryInfo batteryInit(pBatteryInfo bat, char *name, uint8_t pin, float conversionFactor, float lowAlarmVoltage);
 
-void updateBattery(pBatteryInfo bat);
-float getVoltage(pBatteryInfo bat);
-char* getVoltageAsString(pBatteryInfo bat, char *voltageS);
+void batteryUpdate(pBatteryInfo bat);
+float batteryGetVoltage(pBatteryInfo bat);
+char* batteryGetVoltageAsString(pBatteryInfo bat, char *voltageS);
+int batteryIsCharging(pBatteryInfo bat);
 #endif
