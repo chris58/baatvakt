@@ -48,6 +48,10 @@ void pumpSetAlarmDurations(pPumpInfo pump, long alarmDurationOn, long alarmDurat
   pump->alarmDurationOff = alarmDurationOff;
 }
 
+/*
+ * updates the pump, resets time counting for a period
+ * sets duration of THIS period where pump was on to zero.
+ */
 void pumpResetPeriod(pPumpInfo pump){
   pumpUpdate(pump);
   pump->durationLastPeriod = pump->durationThisPeriod;
@@ -55,7 +59,10 @@ void pumpResetPeriod(pPumpInfo pump){
   pump->durationThisPeriod = 0;
 }
 
-
+/*
+ * Initialize a new pump. If pPumpInfo is null allocate memory for it.
+ * Return initialized pPumpInfo (pointer to pumpInfo_t).
+ */
 pPumpInfo pumpInit(pPumpInfo pi, char *name, uint8_t pin, long alarmDurationOn, long alarmDurationOff){
   pPumpInfo pump;
   

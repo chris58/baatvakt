@@ -15,7 +15,7 @@ typedef struct{
   unsigned long last;
   long durationON;
   long durationOFF;
-  long lastReset;
+  unsigned long lastReset;
   long durationThisPeriod;
   long durationLastPeriod;
   uint8_t alarm;
