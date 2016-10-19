@@ -1,0 +1,120 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+
+<!--
+This page requires Flot.
+
+Repository: http://www.flotcharts.org/
+[Previous repository: http://code.google.com/p/flot/]
+
+-->
+
+<html>
+  <script type="text/javascript" src="js-rrd/src/lib/javascriptrrd.wlibs.js"></script>
+  <!-- the above script replaces the rrdfFlotAsync,rrdFlot, rrdFlotSelection, rrdFile, binaryXHR and all the jquery libraries -->
+<!--
+  <?php
+  $messageType = $_GET["messageType"];
+  echo "<script type='text/javascript'>alert('|$messageType|');</script>";
+  ?>
+-->
+  <style type="text/css">
+   @import url(css.css);
+  </style>
+  <style>
+   #mygraph {
+     width: 900px;
+     height: 350px;
+   }
+   button {
+     font-size: 12px;
+   }
+   select {
+     font-size: 12px;
+   }
+  </style>
+  <head>
+    <title>Veslefrikk Timeseries</title>
+  </head>
+
+  <body>
+
+    <div id="wrapper">
+      <ul id="nav">
+	<li><a href="index.html">welcome</a></li>
+	<li><a href="status.html">Status</a></li>
+	<li><a href="timeseries.html">Timeseries</a></li>
+	<li><a href="/cgi-bin/motcos/server2.pl">Raw Data</a></li>
+      </ul>
+      <div id="content">
+	<h2>Timeseries</h2>
+	<button onclick="fname_update()">Reload</button>
+	<select name="client" id="clientName" onchange="fname_update()">
+	  <option value="rrd/Temperatures.veslefrikk.rrd" selected="selected">Temperatures</option>
+	  <option value="rrd/Batteries.veslefrikk.rrd">Batteries</option>
+	  <option value="rrd/Pumps.veslefrikk.rrd">Pumps</option>
+	</select>
+	
+	<!--
+	<table id="infotable" border=1>
+        <tr><td colspan="21"><b>Javascript needed for this page to work</b></td></tr>
+	<tr><td><b>RRD file</b></td><td id="fname">None</td><td><b>Last updated</b></td><td id="last_update" colspan="3">never</td></tr>
+	</table>
+	-->
+	<b>Last updated: </b> <span id="last_update">never</span>
+	<div id="mygraph"></div>
+
+	<script type="text/javascript">
+	 // Remove the Javascript warning
+	 //      document.getElementById("infotable").deleteRow(0);
+	 var my_graph_opts={legend: { noColumns:4},
+			    lines: { show:true },
+			    tooltip: true,
+			    tooltipOpts: {
+	   content: "%s | Time: %x | Value: %y.2", //%s -> series label, %x -> X value, %y -> Y value, %x.2 -> precision of X value, %p -> percent
+	   dateFormat: "%y-%0m-%0d %H-%M",
+	   shifts: {x: 10,	y: 20}
+         }
+	 };
+
+	 var graph_opts={legend: { noColumns:4}};
+	 var ds_graph_opts={'Temperature_Cabin-GAUGE':{ color: "#ff8000", label: 'Cabin', lines: { show: true, fill: false, fillColor:"#ffff80"} },
+                            'Temperature_Engine-GAUGE':{ color: "#00c0c0", label: 'Engine Room', lines: { show: true, fill: false} },
+                            'Temperature_Aft-GAUGE':{ color: "#c0c000", label: 'Aft', lines: { show: true, fill: false} },
+                            'Temperature_Outside-GAUGE':{ color: "#0008ff", label: 'Outside', lines: { show: true, fill: false} },
+                            'lat':{ label: 'Latitude', lines: { show: true, fill: false}, yaxis:2 },
+                            'lon':{ label: 'Longitude', lines: { show: true, fill: false}, yaxis:2 }
+			    };
+
+	 var rrdflot_defaults={ num_cb_rows:9, use_element_buttons: true, 
+				multi_ds:true, multi_rra: true, 
+				use_rra: true, rra:0, 
+				//If multi_ds is off, don't need to include "-GAUGE" in element names
+				use_checked_DSs: true, checked_DSs: ["Temperature_Engine-GAUGE","Temperature_Outside-GAUGE"], 
+				use_windows:false, window_min:1241752800000,window_max:1241974500000,
+				graph_width:"900px",graph_height:"500px", scale_width:"200px", scale_height:"150px",
+				timezone:"0"};
+
+	 //       flot_obj=new rrdFlotAsync("mygraph",null,null,my_graph_opts,ds_graph_opts,rrdflot_defaults);
+	 flot_obj=new rrdFlotAsync("mygraph",null,null,my_graph_opts,ds_graph_opts,rrdflot_defaults, null, null, updateLast);
+
+	 // this function is invoked when the RRD file name changes
+	 function fname_update() {
+	   //        var fname=document.getElementById("input_fname").value;
+           var client=document.getElementById("clientName").value;
+	   //      alert("hallo " + client);
+	   //      document.getElementById("fname").firstChild.data=client;
+	   fname = client;
+           flot_obj.reload(fname);
+	 }
+
+	 function updateLast(x) {
+           if (x !=undefined) {
+	     document.getElementById("last_update").firstChild.data=new Date(x.rrd_data.getLastUpdate()*1000);
+           }
+	 }
+	</script>
+      </div>
+      <div id="foot">Baatvakta</div>
+    </div>
+  </body>
+</html>
