@@ -1,0 +1,148 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<!--
+ Example HTML/javascript file that display the
+ content of a RRD archive file in a graph
+ using the Flot libraries
+ Part of the javascriptRRD package
+ Copyright (c) 2010 Frank Wuerthwein, fkw@ucsd.edu
+                    Igor Sfiligoi, isfiligoi@ucsd.edu
+
+ Original repository: http://javascriptrrd.sourceforge.net/
+ 
+ MIT License [http://www.opensource.org/licenses/mit-license.php]
+
+-->
+
+<!--
+ This page requires Flot.
+
+ Repository: http://www.flotcharts.org/
+ [Previous repository: http://code.google.com/p/flot/]
+
+-->
+
+<html>
+  
+    <script type="text/javascript" src="../lib/javascriptrrd.wlibs.js"></script>
+    <!-- the above script replaces the rrdfFlotAsync,rrdFlot, rrdFlotSelection, rrdFile, binaryXHR and all the jquery libraries -->
+  <head>
+    <title>RRD Graphs with Flot</title>
+  </head>
+
+  <body>
+<!--
+    <h1 id="title">RRD Graphs with Flot</h1>
+    <h3>Applying all available rrdflot_defaults</h3>
+    RRD URL:
+
+    <input type="text" id="input_fname" value="example4.rrd"
+           onchange="fname_update()">
+-->
+     <button onclick="fname_update()">Reload</button>
+
+<select name="client" id="clientName" onchange="fname_update()">
+<option value="LONGY.CS.rrd" selected="selected">Longyearbyen</option>
+<option value="REMOY.CS.rrd">Remøy</option>
+<option value="ATLANTIC.CS.rrd">Atlantic Guardian</option>
+<option value="TRDTST.CS.rrd">Trondheim</option>
+</select>
+
+    <hr>
+
+    <table id="infotable" border=1>
+        <tr><td colspan="21"><b>Javascript needed for this page to work</b></td></tr>
+	<tr><td><b>RRD file</b></td><td id="fname">None</td><td id="last_update" colspan="4">someday</td></tr>
+    </table>
+
+    <div id="mygraph"></div>
+
+    <script type="text/javascript">
+
+      // Remove the Javascript warning
+      document.getElementById("infotable").deleteRow(0);
+
+
+
+      var my_graph_opts={legend: { noColumns:4},
+               lines: { show:true },
+                tooltip: true,
+		tooltipOpts: {
+			content: "%s | Time: %x | Value: %y.2", //%s -> series label, %x -> X value, %y -> Y value, %x.2 -> precision of X value, %p -> percent
+			dateFormat: "%y-%0m-%0d %H-%M",
+			shifts: {x: 10,	y: 20}
+         }
+      };
+
+/*
+var my_graph_opts={ 
+  legend: { position:"nw",noColumns:3},
+   lines: { show:true },
+   yaxis: { autoscaleMargin: 0.20},
+   tooltip: true,
+   tooltipOpts: { content: "<h4>%s</h4> Value: %y.3" }
+};
+*/
+
+      var graph_opts={legend: { noColumns:4}};
+      var ds_graph_opts={'CS-T1T3':{ color: "#ff8000", label: 'Client Round Trip', 
+                                       lines: { show: true, fill: false, fillColor:"#ffff80"} },
+                         'ClientGlideTotal':{ label: 'Total Client Glideins', color: "#00c0c0", 
+                                  lines: { show: true, fill: true} },
+                         'ClientInfoAge':{yaxis:2},
+                         'StatusWait':{color: "#000000",yaxis:2}};
+      var rrdflot_defaults={ num_cb_rows:9, use_element_buttons: true, 
+                             multi_ds:true, multi_rra: true, 
+                             use_rra: true, rra:0, 
+                             //If multi_ds is off, don't need to include "-GAUGE" in element names
+                             use_checked_DSs: true, checked_DSs: ["CS-T1T3-GAUGE","CS-T2T4-GAUGE"], 
+                             use_windows:true, window_min:1241752800000,window_max:1241974500000,
+                             graph_width:"1000px",graph_height:"600px", scale_width:"350px", scale_height:"200px",
+                             timezone:"0"};
+
+       flot_obj=new rrdFlotAsync("mygraph",null,null,my_graph_opts,ds_graph_opts,rrdflot_defaults);
+
+      // this function is invoked when the RRD file name changes
+      function fname_update() {
+//        var fname=document.getElementById("input_fname").value;
+        var client=document.getElementById("clientName").value;
+//      alert("hallo " + client);
+      document.getElementById("fname").firstChild.data=client;
+
+      fname = client;
+        flot_obj.reload(fname);
+
+//CST
+        try {
+          FetchBinaryURLAsync(fname,update_info_handler);
+        } catch (err) {
+           alert("Failed loading "+fname+"\n"+err);
+        }
+//CST
+
+      }
+
+//CST
+      // This is the callback function that,
+      // given a binary file object,
+      // verifies that it is a valid RRD archive
+      // and performs the update of the Web page
+      function update_info_handler(bf) {
+          var rrd_data=undefined;
+          if (bf.getLength()<1) {
+            alert("File "+fname+" is empty (possibly loading failed)!");
+            return 1;
+          }
+          try {
+            var rrd_data=new RRDFile(bf);            
+          } catch(err) {
+            alert("File "+fname+" is not a valid RRD archive!\n"+err);
+          }
+          if (rrd_data!=undefined) {
+	    document.getElementById("last_update").firstChild.data=new Date(rrd_data.getLastUpdate()*1000);
+          }
+      }
+//CST
+
+    </script>
+  </body>
+</html>

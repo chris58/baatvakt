@@ -1,0 +1,53 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>`enter code here`
+ <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <title>Flot Examples</title>
+    <link href="./flot/layout.css" rel="stylesheet" type="text/css">
+    <!--[if lte IE 8]><script language="javascript" type="text/javascript" src="../excanvas.min.js"></script><![endif]-->
+    <script language="javascript" type="text/javascript" src="./flot/jquery.js"></script>
+    <script language="javascript" type="text/javascript" src="./flot/jquery.flot.js"></script>
+
+ </head>
+    <body>
+
+    <h1>Database Plotting</h1>
+
+    <div id="placeholder" style="width:600px;height:300px;"></div>
+
+<?php
+
+    $server = "raga3.sintef.no";
+    $user="chris";
+    $password="Pekka1958"; 
+    $database = "marenor";
+
+    $connection = mysql_connect($server,$user,$password);
+    $db = mysql_select_db($database,$connection);
+
+    $query = "SELECT x_value, y_value FROM table";
+   $query = "select round(clientround, 1) as bucket, count(*) as count, RPAD('', ln(COUNT(*)), '*') AS bar from ClientShort where name = 'REMOY' group by bucket limit 55";
+
+
+
+    $result = mysql_query($query);  
+
+    while($row = mysql_fetch_assoc($result))
+    {
+        $dataset1[] = array($row['x_value'],$row['y_value']);
+    }
+
+?>
+
+
+<script type="text/javascript">
+$(function () {
+
+    var dataset1 = <?php echo json_encode($dataset1); ?>
+
+    $.plot($("#placeholder"),[dataset1] );
+});
+</script>
+
+ </body>
+</html>      
