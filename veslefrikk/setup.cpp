@@ -7,7 +7,7 @@ uint16_t bilge_2_raw;
 uint8_t bilge_state_1;
 uint8_t bilge_state_2;
 
-void initTimer()
+void initTimerXX()
 {
   //Serial.println("Startup Complete. Starting timer...");
    //delay(1000);
@@ -26,7 +26,7 @@ void initTimer()
 
 // http://www.instructables.com/id/Arduino-Timer-Interrupts/
 // see http://www.instructables.com/id/Arduino-Timer-Interrupts/step2/Structuring-Timer-Interrupts/
-void initTimerChris(){
+void initTimerChrisXX(){
   cli();//stop interrupts
 
   //set timer1 interrupt at 1Hz

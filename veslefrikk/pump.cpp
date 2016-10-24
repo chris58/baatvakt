@@ -2,6 +2,11 @@
 
 //#define DEBUGPUMP
 
+/*
+ * update pump, i.e. check whether ON or OFF and calculate corresponding durations
+ * In case an alarm duration is exceeded return the alarm code,
+ * otherwise 0 = ALARM_OFF
+ */
 int pumpUpdate(pPumpInfo pump){
   unsigned long now = millis();
 #ifdef DEBUGPUMP
@@ -38,26 +43,35 @@ int pumpUpdate(pPumpInfo pump){
       pump->last = now;
       pump->status = PUMPOFF;
     }else{ // is still off
+#ifdef DEBUGPUMP
       Serial.print("Pump off time: ");
       Serial.print(now - pump->last);
       Serial.print(", alarm duration: ");
       Serial.println(pump->alarmDurationOff);
+#endif
       if ((now - pump->last) > pump->alarmDurationOff){
+#ifdef DEBUGPUMP
 	Serial.println("!!!!!!!!! Alarm !!!!!!!!!!!!");
+#endif
 	pump->alarm = ALARM_DURATION_OFF;
       }else{
 	pump->alarm = ALARM_OFF;
       }
     }
   }
+#ifdef DEBUGPUMP
   Serial.print("Alarm as return value is " );
   Serial.println(pump->alarm);
+#endif
   return pump->alarm;
 }
 
-void pumpSetAlarmDurations(pPumpInfo pump, unsigned int alarmDurationOn, unsigned int alarmDurationOff){
-  pump->alarmDurationOn = alarmDurationOn;
-  pump->alarmDurationOff = alarmDurationOff;
+/*
+ * Set maximum time for pump durations ON/OFF in seconds
+ */
+void pumpSetAlarmDurations(pPumpInfo pump, unsigned long alarmDurationOn, unsigned long alarmDurationOff){
+  pump->alarmDurationOn = alarmDurationOn * 1000L;
+  pump->alarmDurationOff = alarmDurationOff * 1000L;
 }
 
 /*
@@ -65,7 +79,7 @@ void pumpSetAlarmDurations(pPumpInfo pump, unsigned int alarmDurationOn, unsigne
  * Sets duration of THIS period where pump was on to zero.
  */
 void pumpResetPeriod(pPumpInfo pump){
-  pumpUpdate(pump);
+  //  pumpUpdate(pump);
   pump->durationLastPeriod = pump->durationThisPeriod;
   pump->lastReset = millis();
   pump->durationThisPeriod = 0;

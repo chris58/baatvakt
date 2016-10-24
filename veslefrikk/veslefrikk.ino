@@ -1,12 +1,11 @@
 #include <Time.h>
 #include <avr/wdt.h>
-#include <dsp.h>
-#include <SIM900.h>
+
+//#include <dsp.h>
+//#include "setup.h"
+//#include "waterlevel.h"
+
 #include <sms.h>
-
-#include "setup.h"
-#include "waterlevel.h"
-
 #include "pump.h"
 #include "battery.h"
 #include "temperature1wire.h"
@@ -14,8 +13,8 @@
 
 ///////////////////////
 
-
 // Modem stuff
+const uint8_t IMEI[15] = {48,49,51,57,53,48,48,48,55,50,54,49,52,50,52};
 SMSGSM sms;
 
 int numdata;
@@ -73,8 +72,11 @@ uint16_t temp_sec = 0;
 volatile unsigned long seconds = 0;
 volatile bool checkSMS = false;
 volatile bool doUpdate = false;
+volatile bool sendData = false;
+
 #define SMS_INTERVAL    5 //seconds
 #define UPDATE_INTERVAL 2 //seconds
+#define SEND_INTERVAL 600 //seconds
 
 
 uint8_t data[1024] = {
@@ -161,10 +163,7 @@ void setup(){
   digitalWrite(LED_GREEN, HIGH); // green led on
 }
 
-uint32_t transmit_counter = 0;
-uint32_t reboot_limit = 100;
-
-unsigned long lastTimeSMSsendt = 0;
+static unsigned long lastTimeSMSsendt = 0;
 
 void loop(){ 
   char *txt;
@@ -172,6 +171,8 @@ void loop(){
   char voltage24S[7] = "";
   int alarmCode = ALARM_OFF;
   int alarmID;
+  unsigned int don;
+  unsigned int doff;
 
   if (doUpdate){
     doUpdate = false;
@@ -191,10 +192,15 @@ void loop(){
 
     temperaturesUpdate();
   }
+  
   // 
   //readLevel();
   //
-  
+  if (sendData){
+    pumpResetPeriod(pumpEngine);
+    pumpResetPeriod(pumpAft);
+    // send the data... ;-)
+  }
 
   //Read if there are unread messages on the SIM card
   if (checkSMS){
@@ -256,9 +262,16 @@ void loop(){
       }else if (sscanf(sms_text, "SMS %d", &send_SMS) == 1){
 	snprintf(msg, sizeof(msg), "Sending of alarm SMS %s\n",
 		 (send_SMS > 0) ? "enabled" : "disabled");
+      }else if (sscanf(sms_text, "DONOFF %d %d", &don, &doff) == 2){
+	snprintf(msg, sizeof(msg), "Setting\n"
+		 "DurationOnAlarm=%d seconds\n"
+		 "DurationOffAlarm=%d seconds\n",
+		 don, doff);
+	pumpSetAlarmDurations(pumpEngine, don, doff);
       }else{
 	snprintf(msg, sizeof(msg), "Nice try ... ;-)\n"
-		 "Send\nT for temperatures\n"
+		 "Send\n"
+		 "T for temperatures\n"
 		 "P for pump info or\n"
 		 "B for battery info\n\nRegards\n  Baatvakta Veslefrikk");
       }
@@ -288,7 +301,7 @@ ISR(TIMER1_COMPA_vect){
     doUpdate = true;
   }
   if(seconds > SEND_INTERVAL){
-    send_data = true;
+    sendData = true;
   }
 }
 
@@ -512,3 +525,38 @@ void reboot() {
   wdt_disable();
 }
 
+void initTimer()
+{
+  //Serial.println("Startup Complete. Starting timer...");
+   //delay(1000);
+  cli();            			
+  TCCR1A = 0;
+  TCCR1B = 0;
+  OCR1A = 15624;
+  TCCR1B |= (1 << WGM12);
+  TCCR1B |= (1 << CS10);
+  TCCR1B |= (1 << CS12);
+  TIMSK1 |= (1 << OCIE1A);
+  sei();  
+}
+
+// http://www.instructables.com/id/Arduino-Timer-Interrupts/
+// see http://www.instructables.com/id/Arduino-Timer-Interrupts/step2/Structuring-Timer-Interrupts/
+void initTimerChris(){
+  cli();//stop interrupts
+
+  //set timer1 interrupt at 1Hz
+  TCCR1A = 0;// set entire TCCR1A register to 0
+  TCCR1B = 0;// same for TCCR1B
+  TCNT1  = 0;//initialize counter value to 0
+  // set compare match register for 1hz increments
+  // "compare match register" = [ 16,000,000Hz/ (prescaler * "desired interrupt frequency") ] - 1
+  OCR1A = 15624;// = (16*10^6) / (1024*1) - 1 (must be <65536)
+  // turn on CTC mode
+  TCCR1B |= (1 << WGM12);
+  // Set CS12 and CS10 bits for 1024 prescaler
+  TCCR1B |= (1 << CS12) | (1 << CS10);  
+  // enable timer compare interrupt
+  TIMSK1 |= (1 << OCIE1A);
+  sei();//allow interrupts
+}
