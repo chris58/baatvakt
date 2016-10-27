@@ -1,14 +1,8 @@
 #include <Time.h>
 #include <avr/wdt.h>
 
-//#include <dsp.h>
-//#include "setup.h"
-//#include "waterlevel.h"
-
 #include <sms.h>
-#include "pump.h"
-#include "battery.h"
-#include "temperature1wire.h"
+#include "units.h" // includes pumps, temperatures and batteries
 #include "alarmhandler.h"
 
 ///////////////////////
@@ -257,6 +251,8 @@ void loop(){
 		 battery12V->name, batteryGetVoltageAsString(battery12V, voltage12S),
 		 battery24V->name, batteryGetVoltageAsString(battery24V, voltage24S)
 		 );
+      }else if (sms_text[0] == 'A' || sms_text[0] == 'a'){
+	getActiveAlarmsAsString(msg, sizeof(msg));
       }else if (sscanf(sms_text, "ACK %d", &alarmID) == 1){
 	acknowledgeByIdAlarm(alarmID);
       }else if (sscanf(sms_text, "SMS %d", &send_SMS) == 1){
@@ -273,7 +269,12 @@ void loop(){
 		 "Send\n"
 		 "T for temperatures\n"
 		 "P for pump info or\n"
-		 "B for battery info\n\nRegards\n  Baatvakta Veslefrikk");
+		 "B for battery info\n"
+		 "A for active alarms\n"
+		 "ACK n where n=alarm idx\n"
+		 "SMS 0/1 to turn off/on SMS\n"
+		 "DONOFF on-duration off-duration"
+		 );
       }
 #ifdef DEBUG
       Serial.println(msg);

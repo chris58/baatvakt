@@ -1,4 +1,4 @@
-#include "pump.h"
+#include "units.h"
 
 //#define DEBUGPUMP
 
@@ -25,9 +25,9 @@ int pumpUpdate(pPumpInfo pump){
       pump->status = PUMPON;
     }else{ // is still on
       if ((now - pump->last) > pump->alarmDurationOn){
-	pump->alarm = ALARM_DURATION_ON;
+	pump->alarmCode = ALARM_DURATION_ON;
       }else{
-	pump->alarm = ALARM_OFF;
+	pump->alarmCode = ALARM_OFF;
       }
     }
   }else{ // PUMPOFF
@@ -53,17 +53,17 @@ int pumpUpdate(pPumpInfo pump){
 #ifdef DEBUGPUMP
 	Serial.println("!!!!!!!!! Alarm !!!!!!!!!!!!");
 #endif
-	pump->alarm = ALARM_DURATION_OFF;
+	pump->alarmCode = ALARM_DURATION_OFF;
       }else{
-	pump->alarm = ALARM_OFF;
+	pump->alarmCode = ALARM_OFF;
       }
     }
   }
 #ifdef DEBUGPUMP
   Serial.print("Alarm as return value is " );
-  Serial.println(pump->alarm);
+  Serial.println(pump->alarmCode);
 #endif
-  return pump->alarm;
+  return pump->alarmCode;
 }
 
 /*
@@ -111,6 +111,9 @@ pPumpInfo pumpInit(pPumpInfo pi, char *name, uint8_t pin, unsigned int alarmDura
   pump->status = (analogRead(pump->pin) > 512) ? PUMPON : PUMPOFF;
   pump->alarmDurationOn = alarmDurationOn;
   pump->alarmDurationOff = alarmDurationOff;
+
+  pump->typeID = PUMP;
+  pump->alarmCode = ALARM_OFF;
  
   return pump;
 }
@@ -124,7 +127,7 @@ long pumpGetCurrentStateDuration(pPumpInfo pump){
 }
 
 char *pumpGetAlarmMsg(pPumpInfo pump, char *msg, size_t len){
-  if (pump->alarm != ALARM_OFF){
+  if (pump->alarmCode != ALARM_OFF){
     snprintf(msg, len, 
 	     "ALARM:\nPump %s has been %s for %d sec\n",
 	     pump->name,

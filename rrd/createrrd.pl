@@ -97,6 +97,11 @@ sub runServer{
 	$client_socket->recv($data, 1024);
 	print "received data: $data\n";
 	@pm = split(/;/,$data);
+
+	# sql update
+	$connect = updateMySqlLog($connect, "baatvakta", $pm[0], $pm[1], $pm[2], $pm[3], $pm[4], $pm[5], $pm[6], $pm[7], $pm[8]);
+
+	# rrd update
 	updateTemp("veslefrikk", $pm[0], $pm[1], $pm[2], $pm[3], $pm[4]);
  	updateBat("veslefrikk", $pm[0], $pm[5], $pm[6]);
  	updatePumps("veslefrikk", $pm[0], $pm[7], $pm[8]);
@@ -200,5 +205,51 @@ sub updatePumps{
     }
 }
 
+####################################
+# MySql stuff
+##
+sub connectMySql(){
+#    my ($host, $database, $user, $pw) = @_;
+    my $host = "173.255.236.148";
+    my $database = "veslefrikk";
+    my $user = "veslefrikk";
+    my $pw = "pingvin";
 
+    my $connect = DBI->connect("dbi:mysql:$database;host=$host", $user, $pw) || die("could not connect to $database on $host");
+    
+    return $connect;
+}
+
+# in case connected to mysql, disconnect
+# return undef in any case.
+sub disconnectMySql(){
+    my ($connect) = @_;
+
+    if (defined $connect){
+	$connect->disconnect;
+    }
+    return undef;
+}
+
+# update log table in mysql database
+sub updateMySqlLog(){
+    my ($connect, $name, $time, $tCabin, $tEngine, $tAft, $tOutside, $V12, $V24, $pEngineDuration, $pAftDuration) = @_;
+
+    if (not defined $connect){
+	$connect = connectMySql();
+    }
+
+    if ($DEBUG){
+	print "$lineNr mysql updating $name \n";
+    }
+
+	my $myquery = "replace INTO $name (name, time, tCabin, tEngine, tAft, tOutside, voltage12, voltage24, pEngineDuration, pAftDuration) 
+                       VALUES ('$name', FROM_UNIXTIME($time), $tCabine, $tEngine, $tAft, $tOutside, $V12, $V24, $pEngineDuration, $pAftDuration,)";
+	my $sth = $connect->prepare($myquery);
+	$sth->execute();
+    }
+
+    # return the connection in case it should be used again
+    return $connect;
+}
 

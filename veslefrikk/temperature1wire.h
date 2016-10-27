@@ -5,8 +5,10 @@
 #include <OneWire.h>
 
 typedef struct{
-  DeviceAddress da;
+  uint8_t typeID;
   char name[12];
+  int alarmCode;
+  DeviceAddress da;
   float value;
 } temperatureInfo_t, *pTemperatureInfo;
 

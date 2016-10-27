@@ -3,16 +3,16 @@
 #include <Arduino.h>
 
 typedef struct{
-  short alarm;
-  uint8_t pin;
+  uint8_t typeID;
   char name[12];
+  short alarmCode;
+  uint8_t pin;
   float lowAlarmVoltage;
   uint16_t raw;
   float bit2voltConversion;
 } batteryInfo_t, *pBatteryInfo;
 
 #define ALARM_VOLTAGE_LOW 1
-#define ALARM_OFF 0
 #define ALARM_NOT_CHARGING 2
 
 pBatteryInfo batteryInit(pBatteryInfo bat, char *name, uint8_t pin, float conversionFactor, float lowAlarmVoltage);

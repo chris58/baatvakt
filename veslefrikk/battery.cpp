@@ -1,4 +1,4 @@
-#include "battery.h"
+#include "units.h"
 
 //#define DEBUG_BATTERY
 
@@ -19,6 +19,8 @@ pBatteryInfo batteryInit(pBatteryInfo bi, char *name, uint8_t pin, float convers
   bat->pin = pin;
   bat->bit2voltConversion = conversionFactor;
   bat->lowAlarmVoltage = lowAlarmVoltage;
+  bat->typeID = BATTERY;
+  bat->alarmCode = ALARM_OFF;
 
   return bat;
 }
@@ -36,13 +38,13 @@ int batteryUpdate(pBatteryInfo bat){
 #endif
 
   if (batteryGetVoltage(bat) < bat->lowAlarmVoltage){
-    bat->alarm = ALARM_VOLTAGE_LOW;
+    bat->alarmCode = ALARM_VOLTAGE_LOW;
   }else if (!batteryIsCharging(bat)){
-    bat->alarm = ALARM_NOT_CHARGING;
+    bat->alarmCode = ALARM_NOT_CHARGING;
   }else {
-    bat->alarm = ALARM_OFF;
+    bat->alarmCode = ALARM_OFF;
   }
-  return bat->alarm;
+  return bat->alarmCode;
 }
 
 /*
@@ -73,13 +75,13 @@ int batteryIsCharging(pBatteryInfo bat){
  */
 char *batteryGetAlarmMsg(pBatteryInfo bat, char *msg, size_t len){
   char voltageS[20];
-  if (bat->alarm == ALARM_VOLTAGE_LOW){
+  if (bat->alarmCode == ALARM_VOLTAGE_LOW){
     snprintf(msg, len, 
 	     "ALARM:\nLow Voltage '%s': %s[V]\n",
 	     bat->name,
 	     batteryGetVoltageAsString(bat, voltageS)
 	     );
-  }else if (bat->alarm == ALARM_NOT_CHARGING){
+  }else if (bat->alarmCode == ALARM_NOT_CHARGING){
     snprintf(msg, len, 
 	     "ALARM:\nBattery not charging '%s'\n",
 	     bat->name

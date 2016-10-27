@@ -1,16 +1,17 @@
-#ifndef PUMP
-#define PUMP
+#ifndef PUMP_H
+#define PUMP_H
 #include <Arduino.h>
 
 #define PUMPON 1
 #define PUMPOFF 0
-#define ALARM_OFF 0
 #define ALARM_DURATION_ON 1
 #define ALARM_DURATION_OFF 2
 
 typedef struct{
-  uint8_t pin;
+  uint8_t typeID;
   char name[12];
+  int alarmCode;
+  uint8_t pin;
   uint8_t status;
   unsigned long last;
   long durationON;
@@ -18,7 +19,6 @@ typedef struct{
   unsigned long lastReset;
   long durationThisPeriod;
   long durationLastPeriod;
-  int alarm;
   unsigned long alarmDurationOn;
   unsigned long alarmDurationOff;
 } pumpInfo_t, *pPumpInfo;

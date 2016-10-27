@@ -1,4 +1,4 @@
-#include "temperature1wire.h"
+#include "units.h"
 
 #define ONEWIRE_PIN 13
 #define PROBE_MAX 4 // number of temperature probes. In our case there are 4.
@@ -32,6 +32,8 @@ pTemperatureInfo temperatureAddTemperatureProbe(DeviceAddress da, char *name, ui
       //  memset(ti->name, 0, sizeof(ti->name));
       strncpy(ti->name, name, sizeof(ti->name)-1);
       memcpy(ti->da, da, sizeof(ti->da));
+      ti->typeID = TEMPERATURE;
+      ti->alarmCode = ALARM_OFF;
       
       pti[probeCount++] = ti;
     }

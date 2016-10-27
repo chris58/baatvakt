@@ -1,5 +1,4 @@
 #include <stdlib.h>
-#include "units.h"
 #include "alarmhandler.h"
 
 static pAlarmInfo alarmList[MAX_ALARMS];// = (pAlarmInfo *) calloc(MAX_ALARMS, sizeof(pAlarmInfo *));
@@ -12,9 +11,8 @@ int isAcknowledgedAlarm(void *unit, short alarmCode){
 	return alarmList[i]->acknowledged;
     }
   }
-  // not found... :-( At least not acknowleged...
-  return 0;
-
+  // not found... :-(
+  return ALARM_ERROR;
 }
 
 int removeAlarm(void *unit, short alarmCode){
@@ -67,42 +65,4 @@ void acknowledgeByIdAlarm(int id){
   }
   // problem
   return ALARM_ERROR;
-}
-
-char *getActiveAlarmsAsString(char *buf, int buflen){
-  int i;
-  char txt[64];
-
-  for (i=0; i<MAX_ALARMS; i++){
-    if (alarmList[i] != NULL){
-      pUnitInfo ui = (pUnitInfo) alarmList[i]->unit;
-      switch(ui->typeID){
-      case PUMP:
-	snprintf(txt, sizeof(txt), "Pump %s alarm code: %d id: %d\n",
-		 ((pPumpInfo) ui)->name,
-		 ((pPumpInfo) ui)->alarmCode,
-		 i
-		 );
-	break;
-      case BATTERY:
-	snprintf(txt, sizeof(txt), "Battery %s alarm code: %d id: %d\n",
-		 ((pBatteryInfo) ui)->name,
-		 ((pBatteryInfo) ui)->alarmCode,
-		 i
-		 );
-	break;
-      case TEMPERATURE:
-	snprintf(txt, sizeof(txt), "Battery %s alarm code: %d id: %d\n",
-		 ((pTemperatureInfo) ui)->name,
-		 ((pTemperatureInfo) ui)->alarmCode,
-		 i
-		 );
-	break;
-      default:
-	break;
-      }
-      snprintf(buf, buflen, "%s%s", buf, txt);
-    }
-  }
-  return buf;
 }
