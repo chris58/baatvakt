@@ -77,13 +77,13 @@ char *batteryGetAlarmMsg(pBatteryInfo bat, char *msg, size_t len){
   char voltageS[20];
   if (bat->alarmCode == ALARM_VOLTAGE_LOW){
     snprintf(msg, len, 
-	     "ALARM:\nLow Voltage '%s': %s[V]\n",
+	     "Low Voltage '%s': %s[V]",
 	     bat->name,
 	     batteryGetVoltageAsString(bat, voltageS)
 	     );
   }else if (bat->alarmCode == ALARM_NOT_CHARGING){
     snprintf(msg, len, 
-	     "ALARM:\nBattery not charging '%s'\n",
+	     "Battery not charging '%s'",
 	     bat->name
 	     );
   }else{

@@ -14,8 +14,8 @@ typedef struct{
   uint8_t pin;
   uint8_t status;
   unsigned long last;
-  long durationON;
-  long durationOFF;
+  unsigned long durationON;
+  unsigned long durationOFF;
   unsigned long lastReset;
   long durationThisPeriod;
   long durationLastPeriod;

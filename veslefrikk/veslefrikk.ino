@@ -131,11 +131,21 @@ void setup(){
   pTIout = temperatureAddTemperatureProbe(daOut, "Ute", 0, 40, TEMP_9_BIT);
 
   // the pumps
-  // More than 5 minutes ON and more than 30 minutes OFF will give an alarm
+  // More than 5 minutes ON and more than 60 minutes OFF will give an alarm
   // pumpEngine = pumpInit(NULL, "Maskinrom", PUMPENGINE_PIN, 5*60*1000, 30*60*1000);
-  unsigned long aon = 5L*60L*1000L;
-  unsigned long aoff = 30L*60L*1000L;
+  unsigned long aon = 5L*60L;
+  unsigned long aoff = 60L*60L;
+ 
+  Serial.print("aon/aoff=");
+  char xxx[20] = "";
+  Serial.print(dtostrf(float(aon), 10, 1, xxx));
+  Serial.print("/");
+  Serial.println(dtostrf(float(aoff), 10, 1, xxx));
   pumpEngine = pumpInit(NULL, "Maskinrom", PUMPENGINE_PIN, aon, aoff);
+  Serial.print("in pump struct aon/aoff=");
+  Serial.print(dtostrf(float(pumpEngine->alarmDurationOn), 10, 1, xxx));
+  Serial.print("/");
+  Serial.println(dtostrf(float(pumpEngine->alarmDurationOff), 10, 1, xxx));
   pumpAft = pumpInit(NULL, "Akterlugar", PUMPAFT_PIN, aon, aoff);
 
   // batteries
@@ -251,10 +261,13 @@ void loop(){
 		 battery12V->name, batteryGetVoltageAsString(battery12V, voltage12S),
 		 battery24V->name, batteryGetVoltageAsString(battery24V, voltage24S)
 		 );
-      }else if (sms_text[0] == 'A' || sms_text[0] == 'a'){
-	getActiveAlarmsAsString(msg, sizeof(msg));
       }else if (sscanf(sms_text, "ACK %d", &alarmID) == 1){
 	acknowledgeByIdAlarm(alarmID);
+	snprintf(msg, sizeof(msg), 
+		 "Alarm %d acknowledged\n",
+		 alarmID);
+      }else if (sms_text[0] == 'A' || sms_text[0] == 'a'){
+	getActiveAlarmsAsString(msg, sizeof(msg));
       }else if (sscanf(sms_text, "SMS %d", &send_SMS) == 1){
 	snprintf(msg, sizeof(msg), "Sending of alarm SMS %s\n",
 		 (send_SMS > 0) ? "enabled" : "disabled");
@@ -265,11 +278,10 @@ void loop(){
 		 don, doff);
 	pumpSetAlarmDurations(pumpEngine, don, doff);
       }else{
-	snprintf(msg, sizeof(msg), "Nice try ... ;-)\n"
-		 "Send\n"
-		 "T for temperatures\n"
-		 "P for pump info or\n"
-		 "B for battery info\n"
+	snprintf(msg, sizeof(msg), "Send\n"
+		 "T for temps\n"
+		 "P for pumps\n"
+		 "B for batteries\n"
 		 "A for active alarms\n"
 		 "ACK n where n=alarm idx\n"
 		 "SMS 0/1 to turn off/on SMS\n"
@@ -307,20 +319,25 @@ ISR(TIMER1_COMPA_vect){
 }
 
 void handlePumpAlarm(pPumpInfo pump, short alarmCode){
-    if (alarmCode != ALARM_OFF){
-      if (!isAcknowledgedAlarm(pump, alarmCode)){
-	int id = addAlarm(pump, alarmCode);
-	pumpGetAlarmMsg(pump, msg, sizeof(msg));
-	snprintf(msg, sizeof(msg), "%s\n To acknowledge reply\nACK %d\n", msg, id);
-	sendAlarmMsg(msg);
-      }
-    }else{
-      // make sure that there is no alarm left in the alarm list
-      int removeAlarm(pump, alarmCode);
+  Serial.print("Handle pump alarm ");
+  Serial.println(pump->name);
+
+  if (alarmCode != ALARM_OFF){
+    if (!isAcknowledgedAlarm(pump, alarmCode)){
+      int id = addAlarm(pump, alarmCode);
+      pumpGetAlarmMsg(pump, msg, sizeof(msg));
+      snprintf(msg, sizeof(msg), "%s\n To acknowledge reply\nACK %d\n", msg, id);
+      sendAlarmMsg(msg);
     }
+  }else{
+    // make sure that there is no alarm left in the alarm list
+    removeAlarm(pump, alarmCode);
+  }
 }
 
 void handleBatteryAlarm(pBatteryInfo bat, short alarmCode){
+  Serial.print("Handle battery alarm ");
+  Serial.println(bat->name);
     if (alarmCode != ALARM_OFF){
       if (!isAcknowledgedAlarm(bat, alarmCode)){
 	int id = addAlarm(bat, alarmCode);
@@ -330,14 +347,14 @@ void handleBatteryAlarm(pBatteryInfo bat, short alarmCode){
       }
     }else{
       // make sure that there is no alarm left in the alarm list
-      int removeAlarm(bat, alarmCode);
+      removeAlarm(bat, alarmCode);
     }
 }
 
 void sendAlarmMsg(char *msg){
   if (send_SMS <= 0)
     return;
-  if ((millis() - lastTimeSMSsendt) > 900000UL || lastTimeSMSsendt > millis()){
+  if ((millis() - lastTimeSMSsendt) > 900000UL || lastTimeSMSsendt > millis() || lastTimeSMSsendt == 0){
     sms.SendSMS("93636390", msg);
     lastTimeSMSsendt = millis();
   }

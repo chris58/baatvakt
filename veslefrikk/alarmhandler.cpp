@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include "units.h"
+#include "battery.h"
 #include "alarmhandler.h"
 
 static pAlarmInfo alarmList[MAX_ALARMS];// = (pAlarmInfo *) calloc(MAX_ALARMS, sizeof(pAlarmInfo *));
@@ -19,16 +20,21 @@ int isAcknowledgedAlarm(void *unit, short alarmCode){
 
 int removeAlarm(void *unit, short alarmCode){
   int i;
+  Serial.print("Trying to remove alarm for ");
+  Serial.println(((pUnitInfo) unit)->name);
   for (i=0; i<MAX_ALARMS; i++){
     if (alarmList[i] != NULL){
-      if (alarmList[i]->unit == unit && alarmList[i]->alarmCode == alarmCode){
+      if (alarmList[i]->unit == unit){ //&& alarmList[i]->alarmCode == alarmCode){
 	free(alarmList[i]);
 	alarmList[i] = NULL;
+	Serial.println("Did it");
 	return 1;
       }
     }
   }
   // not found :-(
+  Serial.print("Did not find any alarm of ");
+  Serial.println(((pUnitInfo) unit)->name);
   return ALARM_ERROR;
 }
 
@@ -72,36 +78,49 @@ void acknowledgeByIdAlarm(int id){
 char *getActiveAlarmsAsString(char *buf, int buflen){
   int i;
   char txt[64];
+  char *ptr = buf;
+  int len = buflen;
+  pBatteryInfo bat;
+  pPumpInfo pump;
+
+  buf[0] = '\0';
+  strcpy(buf, "No alarms");
 
   for (i=0; i<MAX_ALARMS; i++){
     if (alarmList[i] != NULL){
       pUnitInfo ui = (pUnitInfo) alarmList[i]->unit;
       switch(ui->typeID){
       case PUMP:
-	snprintf(txt, sizeof(txt), "Pump %s alarm code: %d id: %d\n",
-		 ((pPumpInfo) ui)->name,
-		 ((pPumpInfo) ui)->alarmCode,
-		 i
+	pump = (pPumpInfo) ui;
+	snprintf(ptr, len, "%s id: %d\nAcknowledged: %s",
+		 pumpGetAlarmMsg(pump, txt, sizeof(txt)),
+		 i,
+		 (alarmList[i]->acknowledged ? "YES" : "NO")
 		 );
+	Serial.println(buf);
 	break;
       case BATTERY:
-	snprintf(txt, sizeof(txt), "Battery %s alarm code: %d id: %d\n",
-		 ((pBatteryInfo) ui)->name,
-		 ((pBatteryInfo) ui)->alarmCode,
-		 i
+        bat = (pBatteryInfo) ui;
+	snprintf(ptr, len, "%s id: %d\nAcknowledged: %s",
+		 batteryGetAlarmMsg(bat, txt, sizeof(txt)),
+		 i,
+		 (alarmList[i]->acknowledged ? "YES" : "NO")
 		 );
+	Serial.println(buf);
 	break;
       case TEMPERATURE:
-	snprintf(txt, sizeof(txt), "Battery %s alarm code: %d id: %d\n",
+	snprintf(ptr, len, "Battery %s alarm code: %d id: %d\nAcknowledged: %s",
 		 ((pTemperatureInfo) ui)->name,
 		 ((pTemperatureInfo) ui)->alarmCode,
 		 i
 		 );
+	Serial.println(buf);
 	break;
       default:
 	break;
       }
-      snprintf(buf, buflen, "%s%s", buf, txt);
+      ptr += strlen(ptr);
+      len -= strlen(ptr);
     }
   }
   return buf;

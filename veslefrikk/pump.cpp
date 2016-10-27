@@ -19,8 +19,8 @@ int pumpUpdate(pPumpInfo pump){
 
   if (analogRead(pump->pin) > 512){ // PUMPON
     if (pump->status == PUMPOFF){ // switched from off to on
-      if (now-pump->last > 5000)
-	pump->durationOFF = (now - pump->last);
+      //if (now-pump->last > 5000)
+      pump->durationOFF = (now - pump->last);
       pump->last = now;
       pump->status = PUMPON;
     }else{ // is still on
@@ -32,8 +32,8 @@ int pumpUpdate(pPumpInfo pump){
     }
   }else{ // PUMPOFF
     if (pump->status == PUMPON){ // switched from on to off
-      if (now-pump->last > 5000)
-	pump->durationON =  (now - pump->last);
+      //      if (now-pump->last > 5000)
+      pump->durationON =  (now - pump->last);
 
       if (pump->last > pump->lastReset)
 	pump->durationThisPeriod += (now - pump->last);
@@ -109,8 +109,8 @@ pPumpInfo pumpInit(pPumpInfo pi, char *name, uint8_t pin, unsigned int alarmDura
   pump->durationLastPeriod = 0;
   pump->durationThisPeriod = 0;
   pump->status = (analogRead(pump->pin) > 512) ? PUMPON : PUMPOFF;
-  pump->alarmDurationOn = alarmDurationOn;
-  pump->alarmDurationOff = alarmDurationOff;
+  pump->alarmDurationOn = alarmDurationOn * 1000L;
+  pump->alarmDurationOff = alarmDurationOff * 1000L;
 
   pump->typeID = PUMP;
   pump->alarmCode = ALARM_OFF;
