@@ -13,10 +13,10 @@ typedef struct{
 #define MAX_ALARMS 5
 #define ALARM_ERROR -1
 
-int isAcknowledgedAlarm(void *unit, short alarmCode);
-int removeAlarm(void *unit, short alarmCode);
-int addAlarm(void *unit, short alarmCode);
-void acknowledgeByIdAlarm(int id);
-char *getActiveAlarmsAsString(char *buf, int buflen);
+int alarmIsAcknowledged(void *unit, short alarmCode);
+int alarmRemove(void *unit, short alarmCode);
+int alarmAdd(void *unit, short alarmCode);
+void alarmAcknowledgeById(int id);
+char *alarmGetActiveAlarmsAsString(char *buf, int buflen);
 
 #endif

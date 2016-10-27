@@ -262,12 +262,12 @@ void loop(){
 		 battery24V->name, batteryGetVoltageAsString(battery24V, voltage24S)
 		 );
       }else if (sscanf(sms_text, "ACK %d", &alarmID) == 1){
-	acknowledgeByIdAlarm(alarmID);
+	alarmAcknowledgeById(alarmID);
 	snprintf(msg, sizeof(msg), 
 		 "Alarm %d acknowledged\n",
 		 alarmID);
       }else if (sms_text[0] == 'A' || sms_text[0] == 'a'){
-	getActiveAlarmsAsString(msg, sizeof(msg));
+	alarmGetActiveAlarmsAsString(msg, sizeof(msg));
       }else if (sscanf(sms_text, "SMS %d", &send_SMS) == 1){
 	snprintf(msg, sizeof(msg), "Sending of alarm SMS %s\n",
 		 (send_SMS > 0) ? "enabled" : "disabled");
@@ -323,15 +323,15 @@ void handlePumpAlarm(pPumpInfo pump, short alarmCode){
   Serial.println(pump->name);
 
   if (alarmCode != ALARM_OFF){
-    if (!isAcknowledgedAlarm(pump, alarmCode)){
-      int id = addAlarm(pump, alarmCode);
+    if (!alarmIsAcknowledged(pump, alarmCode)){
+      int id = alarmAdd(pump, alarmCode);
       pumpGetAlarmMsg(pump, msg, sizeof(msg));
       snprintf(msg, sizeof(msg), "%s\n To acknowledge reply\nACK %d\n", msg, id);
       sendAlarmMsg(msg);
     }
   }else{
     // make sure that there is no alarm left in the alarm list
-    removeAlarm(pump, alarmCode);
+    alarmRemove(pump, alarmCode);
   }
 }
 
@@ -339,15 +339,15 @@ void handleBatteryAlarm(pBatteryInfo bat, short alarmCode){
   Serial.print("Handle battery alarm ");
   Serial.println(bat->name);
     if (alarmCode != ALARM_OFF){
-      if (!isAcknowledgedAlarm(bat, alarmCode)){
-	int id = addAlarm(bat, alarmCode);
+      if (!alarmIsAcknowledged(bat, alarmCode)){
+	int id = alarmAdd(bat, alarmCode);
 	batteryGetAlarmMsg(bat, msg, sizeof(msg));
 	snprintf(msg, sizeof(msg), "%s\n To acknowledge reply\nACK %d\n", msg, id);
 	sendAlarmMsg(msg);
       }
     }else{
       // make sure that there is no alarm left in the alarm list
-      removeAlarm(bat, alarmCode);
+      alarmRemove(bat, alarmCode);
     }
 }
 

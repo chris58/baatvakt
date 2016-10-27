@@ -5,7 +5,7 @@
 
 static pAlarmInfo alarmList[MAX_ALARMS];// = (pAlarmInfo *) calloc(MAX_ALARMS, sizeof(pAlarmInfo *));
 
-int isAcknowledgedAlarm(void *unit, short alarmCode){
+int alarmIsAcknowledged(void *unit, short alarmCode){
   int i;
   for (i=0; i<MAX_ALARMS; i++){
     if (alarmList[i] != NULL){
@@ -18,7 +18,7 @@ int isAcknowledgedAlarm(void *unit, short alarmCode){
 
 }
 
-int removeAlarm(void *unit, short alarmCode){
+int alarmRemove(void *unit, short alarmCode){
   int i;
   Serial.print("Trying to remove alarm for ");
   Serial.println(((pUnitInfo) unit)->name);
@@ -38,7 +38,7 @@ int removeAlarm(void *unit, short alarmCode){
   return ALARM_ERROR;
 }
 
-int addAlarm(void *unit, short alarmCode){
+int alarmAdd(void *unit, short alarmCode){
   int i;
   for (i=0; i<MAX_ALARMS; i++){
     if (alarmList[i] != NULL){
@@ -66,7 +66,7 @@ int addAlarm(void *unit, short alarmCode){
 /*
  * Used when SMS with "ACK id" recieved, where 0<=id<MAX_ALARMS
  */
-void acknowledgeByIdAlarm(int id){
+void alarmAcknowledgeById(int id){
   if (id >=0 && id < MAX_ALARMS && alarmList[id] != NULL){
     alarmList[id]->acknowledged = 1;
     return id;
@@ -75,7 +75,7 @@ void acknowledgeByIdAlarm(int id){
   return ALARM_ERROR;
 }
 
-char *getActiveAlarmsAsString(char *buf, int buflen){
+char *alarmGetActiveAlarmsAsString(char *buf, int buflen){
   int i;
   char txt[64];
   char *ptr = buf;
