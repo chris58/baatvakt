@@ -25,13 +25,14 @@ typedef struct{
 
 #define pumpIsRunning(pump) (pump->status)
 #define pumpGetName(pump) (pump->name)
+#define pumpGetAlarm(pump) (pump->alarmCode)
 
 pPumpInfo pumpInit(pPumpInfo p, char *name, uint8_t pin, unsigned int alarmDurationOn, unsigned int alarmDurationOff);
 
 int pumpUpdate(pPumpInfo pump);
 long pumpGetCurrentStateDuration(pPumpInfo pump);
 void pumpSetAlarmDurations(pPumpInfo pump, unsigned long alarmDurationOn, unsigned long alarmDurationOff);
-void pumpResetPeriod(pPumpInfo pump);
+unsigned long pumpResetPeriod(pPumpInfo pump);
 char *pumpGetAlarmMsg(pPumpInfo pump, char *msg, size_t len);
 
 

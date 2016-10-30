@@ -3,8 +3,16 @@
 #include "battery.h"
 #include "alarmhandler.h"
 
+//#define DEBUG_ALARM
+
+/*
+ * Array of all active alarms, max MA_ALARMS long
+ */
 static pAlarmInfo alarmList[MAX_ALARMS];// = (pAlarmInfo *) calloc(MAX_ALARMS, sizeof(pAlarmInfo *));
 
+/*
+ * find out whether an alarm has been acknowledged (by SMS)
+ */
 int alarmIsAcknowledged(void *unit, short alarmCode){
   int i;
   for (i=0; i<MAX_ALARMS; i++){
@@ -18,6 +26,9 @@ int alarmIsAcknowledged(void *unit, short alarmCode){
 
 }
 
+/*
+ * Find and remove a specific alarm
+ */
 int alarmRemove(void *unit, short alarmCode){
   int i;
   Serial.print("Trying to remove alarm for ");
@@ -38,6 +49,10 @@ int alarmRemove(void *unit, short alarmCode){
   return ALARM_ERROR;
 }
 
+/*
+ * Find empty spot in alarm list and insert a new alarm
+ * Check first whether it's there already
+ */
 int alarmAdd(void *unit, short alarmCode){
   int i;
   for (i=0; i<MAX_ALARMS; i++){
@@ -71,10 +86,13 @@ void alarmAcknowledgeById(int id){
     alarmList[id]->acknowledged = 1;
     return id;
   }
-  // problem
+  // not found
   return ALARM_ERROR;
 }
 
+/*
+ * Build a string of all active alarms
+ */
 char *alarmGetActiveAlarmsAsString(char *buf, int buflen){
   int i;
   char txt[64];
@@ -92,7 +110,7 @@ char *alarmGetActiveAlarmsAsString(char *buf, int buflen){
       switch(ui->typeID){
       case PUMP:
 	pump = (pPumpInfo) ui;
-	snprintf(ptr, len, "%s id: %d\nAcknowledged: %s",
+	snprintf(ptr, len, "%s id: %d\nAcknowledged: %s\n",
 		 pumpGetAlarmMsg(pump, txt, sizeof(txt)),
 		 i,
 		 (alarmList[i]->acknowledged ? "YES" : "NO")
@@ -101,7 +119,7 @@ char *alarmGetActiveAlarmsAsString(char *buf, int buflen){
 	break;
       case BATTERY:
         bat = (pBatteryInfo) ui;
-	snprintf(ptr, len, "%s id: %d\nAcknowledged: %s",
+	snprintf(ptr, len, "%s id: %d\nAcknowledged: %s\n",
 		 batteryGetAlarmMsg(bat, txt, sizeof(txt)),
 		 i,
 		 (alarmList[i]->acknowledged ? "YES" : "NO")
@@ -109,12 +127,14 @@ char *alarmGetActiveAlarmsAsString(char *buf, int buflen){
 	Serial.println(buf);
 	break;
       case TEMPERATURE:
-	snprintf(ptr, len, "Battery %s alarm code: %d id: %d\nAcknowledged: %s",
+	snprintf(ptr, len, "Battery %s alarm code: %d id: %d\nAcknowledged: %s\n",
 		 ((pTemperatureInfo) ui)->name,
 		 ((pTemperatureInfo) ui)->alarmCode,
 		 i
 		 );
+#ifdef DEBUG_ALARM
 	Serial.println(buf);
+#endif
 	break;
       default:
 	break;

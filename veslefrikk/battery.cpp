@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include "units.h"
 
 //#define DEBUG_BATTERY
@@ -71,7 +72,7 @@ int batteryIsCharging(pBatteryInfo bat){
 }
 
 /*
- * utility to prepare a status message
+ * utility to prepare a alarm status message
  */
 char *batteryGetAlarmMsg(pBatteryInfo bat, char *msg, size_t len){
   char voltageS[20];
@@ -88,10 +89,9 @@ char *batteryGetAlarmMsg(pBatteryInfo bat, char *msg, size_t len){
 	     );
   }else{
     snprintf(msg, len, 
-	     "Status for battery '%s' is ok\n",
+	     "Status for battery '%s' is ok",
 	     bat->name
 	     );
   }
   return msg;
 }
-

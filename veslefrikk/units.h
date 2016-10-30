@@ -17,4 +17,6 @@ typedef struct{
 #define BATTERY 1
 #define TEMPERATURE 2
 
+
+unsigned long getSeconds();
 #endif

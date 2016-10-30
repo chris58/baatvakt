@@ -3,12 +3,12 @@
 //#define DEBUGPUMP
 
 /*
- * update pump, i.e. check whether ON or OFF and calculate corresponding durations
+ * update pump, i.e. check whether ON or OFF and calculate corresponding durations.
  * In case an alarm duration is exceeded return the alarm code,
- * otherwise 0 = ALARM_OFF
+ * otherwise return ALARM_OFF
  */
 int pumpUpdate(pPumpInfo pump){
-  unsigned long now = millis();
+  unsigned long now = getSeconds();
 #ifdef DEBUGPUMP
   Serial.print(pump->name);
   Serial.print(" raw ");
@@ -17,7 +17,7 @@ int pumpUpdate(pPumpInfo pump){
   Serial.println(now);
 #endif
 
-  if (analogRead(pump->pin) > 512){ // PUMPON
+  if (analogRead(pump->pin) > 512){ // at least half the voltage, i.e. PUMPON
     if (pump->status == PUMPOFF){ // switched from off to on
       //if (now-pump->last > 5000)
       pump->durationOFF = (now - pump->last);
@@ -70,19 +70,20 @@ int pumpUpdate(pPumpInfo pump){
  * Set maximum time for pump durations ON/OFF in seconds
  */
 void pumpSetAlarmDurations(pPumpInfo pump, unsigned long alarmDurationOn, unsigned long alarmDurationOff){
-  pump->alarmDurationOn = alarmDurationOn * 1000L;
-  pump->alarmDurationOff = alarmDurationOff * 1000L;
+  pump->alarmDurationOn = alarmDurationOn; // * 1000L;
+  pump->alarmDurationOff = alarmDurationOff; // * 1000L;
 }
 
 /*
  * Updates the pump, resets time counting for a period.
  * Sets duration of THIS period where pump was on to zero.
  */
-void pumpResetPeriod(pPumpInfo pump){
+unsigned long pumpResetPeriod(pPumpInfo pump){
   //  pumpUpdate(pump);
   pump->durationLastPeriod = pump->durationThisPeriod;
-  pump->lastReset = millis();
+  pump->lastReset = getSeconds();
   pump->durationThisPeriod = 0;
+  return pump->durationLastPeriod;
 }
 
 /*
@@ -104,14 +105,13 @@ pPumpInfo pumpInit(pPumpInfo pi, char *name, uint8_t pin, unsigned int alarmDura
   pump->pin = pin;
   pump->durationON = 0;
   pump->durationOFF = 0;
-  pump->last = millis();
-  pump->lastReset = millis();
+  pump->last = getSeconds();
+  pump->lastReset = getSeconds();
   pump->durationLastPeriod = 0;
   pump->durationThisPeriod = 0;
   pump->status = (analogRead(pump->pin) > 512) ? PUMPON : PUMPOFF;
-  pump->alarmDurationOn = alarmDurationOn * 1000L;
-  pump->alarmDurationOff = alarmDurationOff * 1000L;
-
+  pump->alarmDurationOn = alarmDurationOn;// * 1000L;
+  pump->alarmDurationOff = alarmDurationOff;// * 1000L;
   pump->typeID = PUMP;
   pump->alarmCode = ALARM_OFF;
  
@@ -119,11 +119,11 @@ pPumpInfo pumpInit(pPumpInfo pi, char *name, uint8_t pin, unsigned int alarmDura
 }
 
 /* 
-   A duration, i.e. how long has the pump
+   A duration, i.e. how long the pump has
    either been OFF (if it's OFF now) or ON (in case it's ON now)
 */
 long pumpGetCurrentStateDuration(pPumpInfo pump){
-  return (millis() - pump->last);
+  return (getSeconds() - pump->last);
 }
 
 char *pumpGetAlarmMsg(pPumpInfo pump, char *msg, size_t len){
@@ -132,7 +132,7 @@ char *pumpGetAlarmMsg(pPumpInfo pump, char *msg, size_t len){
 	     "ALARM:\nPump %s has been %s for %d sec\n",
 	     pump->name,
 	     ((pump->status == PUMPON)? "ON" : "OFF"),
-	     (int) (pumpGetCurrentStateDuration(pump) / 1000.0)
+	     (int) (pumpGetCurrentStateDuration(pump)) // / 1000.0)
 	     );
   }else{
     snprintf(msg, len, 
@@ -143,7 +143,9 @@ char *pumpGetAlarmMsg(pPumpInfo pump, char *msg, size_t len){
   return msg;
 }
 
-
+/*
+ * build the status message which is returned when pump status is required
+ */
 char *pumpGetStatusMsg(pPumpInfo pump, char *msg, size_t len){
   snprintf(msg, len, 
 	   "%s has been %s for %d sec\n" 
@@ -151,9 +153,9 @@ char *pumpGetStatusMsg(pPumpInfo pump, char *msg, size_t len){
 	   " last off for %d sec\n",
 	   pump->name,
 	   ((pump->status == PUMPON)? "ON" : "OFF"),
-	   (int) (pumpGetCurrentStateDuration(pump) / 1000.0),
-	   (int) (pump->durationON/1000),
-	   (int) (pump->durationOFF/1000)
+	   (int) (pumpGetCurrentStateDuration(pump)), // / 1000.0),
+	   (int) (pump->durationON), // /1000),
+	   (int) (pump->durationOFF) // /1000)
 	   );
   return msg;
 }
