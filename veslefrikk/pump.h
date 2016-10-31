@@ -34,6 +34,6 @@ long pumpGetCurrentStateDuration(pPumpInfo pump);
 void pumpSetAlarmDurations(pPumpInfo pump, unsigned long alarmDurationOn, unsigned long alarmDurationOff);
 unsigned long pumpResetPeriod(pPumpInfo pump);
 char *pumpGetAlarmMsg(pPumpInfo pump, char *msg, size_t len);
-
+char *pumpGetNMEA(int n, ...);
 
 #endif

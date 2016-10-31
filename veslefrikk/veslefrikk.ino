@@ -101,15 +101,8 @@ void setup(){
   //For http uses it's reccomanded to use 4800 or slower.
   gsm.begin(4800); // Serial3 in our case
 
-  ///////////////////////////////////
-
-  //Serial.println("initSensors()");
-  //delay(500);
-  //initSensors();
-  //delay(500);
-
   /***************** conversion latin-1 to gsm *************
-   //   http://www.developershome.com/sms/gsmAlphabet.asp
+   *   http://www.developershome.com/sms/gsmAlphabet.asp
    ********************************************************/
 
   // temperatures
@@ -128,7 +121,7 @@ void setup(){
   char xxx[20] = "";
   Serial.print(dtostrf(float(aon), 10, 1, xxx));
   Serial.print("/");
-b  Serial.println(dtostrf(float(aoff), 10, 1, xxx));
+  Serial.println(dtostrf(float(aoff), 10, 1, xxx));
 #endif
   pPumpEngine = pumpInit(NULL, "Maskinrom", PUMPENGINE_PIN, aon, aoff);
 #ifdef DEBUG_VESLEFRIKK
@@ -143,16 +136,8 @@ b  Serial.println(dtostrf(float(aoff), 10, 1, xxx));
   pBattery12V = batteryInit(NULL, "12V Batteri", BATTERY12V_PIN, (13.12/844.0), 12);
   pBattery24V = batteryInit(NULL, "24V Batteri", BATTERY24V_PIN, (27.51/932.0), 24);
 
-#ifdef DEBUG_VESLEFRIKK
-  Serial.println("initTimer()");
-#endif
-  delay(500);
   initTimer();
   delay(500);
-
-  /* for(int i = 0; i < 15; i++){                    */
-  /*   data[i] = IMEI[i]; */
-  /* } */
   
   sms.SendSMS("93636390", "Baatvakta SMS version on Veslefrikk started");
 
@@ -174,11 +159,9 @@ void loop(){
   char sms_text[160];
   char phone_number[20]; // array for the phone number string
   char sms_nr;
-  //  baatvaktData_t bd;
   data_union bdUnion;
   float v;
   char vs[12];
-  
 
   if (doUpdate){
     doUpdate = false;
@@ -199,9 +182,6 @@ void loop(){
     temperaturesUpdate();
   }
   
-  // 
-  //readLevel();
-  //
   if (sendData){
     sendData = false;
     // timestamp
@@ -376,6 +356,9 @@ void handlePumpAlarm(pPumpInfo pump, short alarmCode){
   }
 }
 
+/*
+ * react on battery alarm
+ */
 void handleBatteryAlarm(pBatteryInfo bat, short alarmCode){
   Serial.print("Handle battery alarm ");
   Serial.println(bat->name);
@@ -392,6 +375,9 @@ void handleBatteryAlarm(pBatteryInfo bat, short alarmCode){
   }
 }
 
+/*
+ * Send an alarm message if alarmRepeatInterval seconds have past
+ */
 void sendAlarmMsg(char *msg){
   if (send_SMS <= 0)
     return;
@@ -401,7 +387,9 @@ void sendAlarmMsg(char *msg){
   }
 }
 
-
+/*
+ * seconds since start up
+ */
 unsigned long getSeconds(){
   return seconds;
 }
@@ -415,10 +403,7 @@ void reboot() {
   wdt_disable();
 }
 
-void initTimer()
-{
-  //Serial.println("Startup Complete. Starting timer...");
-  //delay(1000);
+void initTimerOld(){
   cli();            			
   TCCR1A = 0;
   TCCR1B = 0;
@@ -430,11 +415,15 @@ void initTimer()
   sei();  
 }
 
-// http://www.instructables.com/id/Arduino-Timer-Interrupts/
-// see http://www.instructables.com/id/Arduino-Timer-Interrupts/step2/Structuring-Timer-Interrupts/
-void initTimerChris(){
-  cli();//stop interrupts
 
+/* 
+ * Start timer interrupts
+ * 
+ * http://www.instructables.com/id/Arduino-Timer-Interrupts/
+ * see http://www.instructables.com/id/Arduino-Timer-Interrupts/step2/Structuring-Timer-Interrupts
+*/
+void initTimer(){
+  cli();//stop interrupts
   //set timer1 interrupt at 1Hz
   TCCR1A = 0;// set entire TCCR1A register to 0
   TCCR1B = 0;// same for TCCR1B
@@ -452,14 +441,19 @@ void initTimerChris(){
 }
 
 /*
-1. AT+CLTS=1 ----> This is the AT command to enable the gsm module to get the time from the network, once the gsm module is powered on.
-2. AT+CCLK? -----> Once the first AT command is executed, this command can be executed to get the network time.
-http://www.edaboard.com/thread306862.html
-*/
-
-//Returns Unix time from SIM900
-unsigned long int getUnixTime(){
+ * Returns Unix time from SIM900
+ * Should probably be moved to GSM library
+ * 
+ * For info about what's going on:
+ * 1. AT+CLTS=1 ----> This is the AT command to enable the gsm module to get the time from the network, once the gsm module is powered on.
+ * 2. AT+CCLK? -----> Once the first AT command is executed, this command can be executed to get the network time.
+ * http://www.edaboard.com/thread306862.html
+ *
+ * Code works although "AT+CLTS=1" not sendt...
+ */
+unsigned long getUnixTime(){
   byte status;
+  tmElements_t tm;
 
   gsm.SimpleWriteln(F("AT+CCLK?"));
   // 5 sec. for initial comm tmout
@@ -478,18 +472,16 @@ unsigned long int getUnixTime(){
 
   char *s = (char *)gsm.comm_buf;
 	
-  //\n+CCLK: "16/10/30,11:48:06+04\nOK\n"
-  //Using Time.h library to convert from date time to Unix time
-  tmElements_t tmSet;
+  //...\n+CCLK: "16/10/30,11:48:06+04\nOK\n..."
   int ret = sscanf(s, "%*[^\"]\"%d/%d/%d,%d:%d:%d%*s",
-	 &tmSet.Year,
-	 &tmSet.Month,		
-	 &tmSet.Day,
-	 &tmSet.Hour,
-	 &tmSet.Minute,
-	 &tmSet.Second);
-	
-  Serial.print("scanf returned ");
-  Serial.println(ret);
-  return makeTime(tmSet);         //Return Unix time as unsigned long
+	 &tm.Year,
+	 &tm.Month,		
+	 &tm.Day,
+	 &tm.Hour,
+	 &tm.Minute,
+	 &tm.Second);
+
+  tm.Year += (2000 -1970); // Unix time started 1.1.1970..
+  //Using Time.h library to convert from date time to Unix time
+  return makeTime(tm); //Return Unix time as unsigned long
 }

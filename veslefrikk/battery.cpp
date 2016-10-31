@@ -3,6 +3,8 @@
 
 //#define DEBUG_BATTERY
 
+static char nmea[48];
+
 /*
  * Initialize a new battery structure
  * Return pointer to it
@@ -95,3 +97,31 @@ char *batteryGetAlarmMsg(pBatteryInfo bat, char *msg, size_t len){
   }
   return msg;
 }
+
+
+char *batteryGetNMEA(int n, ...){
+  va_list arguments;                     
+  pBatteryInfo bat;
+  int i;
+  int len = sizeof(nmea);
+  char *ptr = nmea;
+  
+  va_start(arguments, n);
+  snprintf(ptr, len, "$PMP,%d", n);
+  ptr += strlen(ptr);
+  len -= strlen(ptr);
+  
+  for (i=0; i<n; i++){
+    bat = va_arg ( arguments, pBatteryInfo);
+    snprintf(ptr, len, "%d", batteryGetVoltage(bat));
+    ptr += strlen(ptr);
+    len -= strlen(ptr);
+  }
+  va_end(arguments);
+
+  uint32_t checksum = CRC32::checksum(nmea, strlen(nmea));
+  snprintf(ptr, len, "*%d\r\n", checksum);
+
+  return nmea;
+}
+

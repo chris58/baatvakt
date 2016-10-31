@@ -23,5 +23,6 @@ float batteryGetVoltage(pBatteryInfo bat);
 char* batteryGetVoltageAsString(pBatteryInfo bat, char *voltageS);
 int batteryIsCharging(pBatteryInfo bat);
 char *batteryGetAlarmMsg(pBatteryInfo bat, char *msg, size_t len);
+char *batteryGetNMEA(int n, ...);
 
 #endif
