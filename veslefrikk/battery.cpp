@@ -62,6 +62,9 @@ float batteryGetVoltage(pBatteryInfo bat){
   return bat->raw * bat->bit2voltConversion;
 }
 
+/*
+ * Return voltage (float) as string
+ */
 char* batteryGetVoltageAsString(pBatteryInfo bat, char *voltageS){
   return dtostrf(batteryGetVoltage(bat), 5, 2, voltageS);
 }
@@ -74,10 +77,13 @@ int batteryIsCharging(pBatteryInfo bat){
 }
 
 /*
- * utility to prepare a alarm status message
+ * Return a string containing the alarm message, if any.
  */
 char *batteryGetAlarmMsg(pBatteryInfo bat, char *msg, size_t len){
   char voltageS[20];
+#ifdef DEBUG_BATTERY
+  Serial.print("batteryGetAlarmmsg "); Serial.println(bat->alarmCode);
+#endif
   if (bat->alarmCode == ALARM_VOLTAGE_LOW){
     snprintf(msg, len, 
 	     "Low Voltage '%s': %s[V]",
@@ -86,15 +92,16 @@ char *batteryGetAlarmMsg(pBatteryInfo bat, char *msg, size_t len){
 	     );
   }else if (bat->alarmCode == ALARM_NOT_CHARGING){
     snprintf(msg, len, 
-	     "Battery not charging '%s'",
+	     "Not charging '%s'",
 	     bat->name
 	     );
   }else{
     snprintf(msg, len, 
-	     "Status for battery '%s' is ok",
+	     "Battery '%s' ok",
 	     bat->name
 	     );
   }
+  //Serial.println(msg);
   return msg;
 }
 
@@ -105,22 +112,23 @@ char *batteryGetNMEA(int n, ...){
   int i;
   int len = sizeof(nmea);
   char *ptr = nmea;
+  char voltageS[7] = "";
   
   va_start(arguments, n);
-  snprintf(ptr, len, "$PMP,%d", n);
+  snprintf(ptr, len, "$PBAT");
   ptr += strlen(ptr);
   len -= strlen(ptr);
   
   for (i=0; i<n; i++){
     bat = va_arg ( arguments, pBatteryInfo);
-    snprintf(ptr, len, "%d", batteryGetVoltage(bat));
+    snprintf(ptr, len, ",%s", batteryGetVoltageAsString(bat, voltageS));
     ptr += strlen(ptr);
     len -= strlen(ptr);
   }
   va_end(arguments);
 
   uint32_t checksum = CRC32::checksum(nmea, strlen(nmea));
-  snprintf(ptr, len, "*%d\r\n", checksum);
+  snprintf(ptr, len, "*%d", checksum);
 
   return nmea;
 }

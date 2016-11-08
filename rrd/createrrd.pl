@@ -28,9 +28,11 @@ use IO::Socket::INET;
 
 my $DEBUG;
 
+my $connect;
+
 
 MAIN:{
-    my $connect;
+#    my $connect;
     undef $connect;
 
 ##################
@@ -71,7 +73,7 @@ sub runServer{
 
     # auto-flush on socket
     $| = 1;
- 
+    
     # creating a listening socket
     my $socket = new IO::Socket::INET (
 	LocalHost => '0.0.0.0',
@@ -85,6 +87,7 @@ sub runServer{
     
     while(1){
 	# waiting for a new client connection
+	print "waiting for new client\n";
 	my $client_socket = $socket->accept();
 	
 	# get information about a newly connected client
@@ -92,23 +95,32 @@ sub runServer{
 	my $client_port = $client_socket->peerport();
 	print "connection from $client_address:$client_port\n";
 	
-	# read up to 1024 characters from the connected client
-	my $data = "";
-	$client_socket->recv($data, 1024);
-	print "received data: $data\n";
-	@pm = split(/;/,$data);
+	if (1 == 2){ # string
+	    # read up to 1024 characters from the connected client
+	    my $data = "";
+	    $client_socket->recv($data, 1024);
+	    print "received data: $data\n";
+	    
+	    @pm = split(/;/,$data);
 
+	}else{
+	    my $bytes;
+	    $client_socket->recv($bytes, 1024);
+	    ($pm[0], $pm[1], $pm[2], $pm[3], $pm[4], $pm[5], $pm[6], $pm[7], $pm[8]) = unpack( "LffffffLL", $bytes );
+	}
 	# sql update
 	$connect = updateMySqlLog($connect, "baatvakta", $pm[0], $pm[1], $pm[2], $pm[3], $pm[4], $pm[5], $pm[6], $pm[7], $pm[8]);
-
+	
 	# rrd update
 	updateTemp("veslefrikk", $pm[0], $pm[1], $pm[2], $pm[3], $pm[4]);
- 	updateBat("veslefrikk", $pm[0], $pm[5], $pm[6]);
- 	updatePumps("veslefrikk", $pm[0], $pm[7], $pm[8]);
-	
+	updateBat("veslefrikk", $pm[0], $pm[5], $pm[6]);
+	updatePumps("veslefrikk", $pm[0], $pm[7], $pm[8]);
+
+
+
 	# write response data to the connected client
-	$data = "ok";
-	$client_socket->send($data);
+	my $answer = "ok";
+	$client_socket->send($answer);
 	
 	# notify client that response has been sent
 	shutdown($client_socket, 1);
@@ -239,17 +251,21 @@ sub updateMySqlLog(){
 	$connect = connectMySql();
     }
 
+    // Still alive?
+    if (not $connect->ping){
+	$connect = connectMySql();
+    }
+
     if ($DEBUG){
-	print "$lineNr mysql updating $name \n";
+	print "mysql updating $name \n";
     }
 
-	my $myquery = "replace INTO $name (name, time, tCabin, tEngine, tAft, tOutside, voltage12, voltage24, pEngineDuration, pAftDuration) 
-                       VALUES ('$name', FROM_UNIXTIME($time), $tCabine, $tEngine, $tAft, $tOutside, $V12, $V24, $pEngineDuration, $pAftDuration,)";
-	my $sth = $connect->prepare($myquery);
-	$sth->execute();
-    }
+    my $myquery = "replace INTO $name (time, tCabin, tEngine, tAft, tOutside, voltage12, voltage24, pump12, pump24) 
+                       VALUES (FROM_UNIXTIME($time), $tCabin, $tEngine, $tAft, $tOutside, $V12, $V24, $pEngineDuration, $pAftDuration)";
+    my $sth = $connect->prepare($myquery);
+    $sth->execute();
 
-    # return the connection in case it should be used again
+# return the connection in case it should be used again
     return $connect;
 }
 

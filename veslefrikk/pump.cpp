@@ -121,14 +121,20 @@ pPumpInfo pumpInit(pPumpInfo pi, char *name, uint8_t pin, unsigned int alarmDura
 }
 
 /* 
-   A duration, i.e. how long the pump has
-   either been OFF (if it's OFF now) or ON (in case it's ON now)
+ * A duration, i.e. how long the pump has
+ * either been OFF (if it's OFF now) or ON (in case it's ON now)
 */
 long pumpGetCurrentStateDuration(pPumpInfo pump){
   return (getSeconds() - pump->last);
 }
 
+/*
+ * Return a string containing the alarm message, if any.
+ */
 char *pumpGetAlarmMsg(pPumpInfo pump, char *msg, size_t len){
+#ifdef DEBUGPUMP
+  Serial.print("pumpGetAlarmmsg "); Serial.println(pump->alarmCode);
+#endif
   if (pump->alarmCode != ALARM_OFF){
     snprintf(msg, len, 
 	     "ALARM:\nPump %s has been %s for %d sec\n",
@@ -142,11 +148,15 @@ char *pumpGetAlarmMsg(pPumpInfo pump, char *msg, size_t len){
 	     pump->name
 	     );
   }
+
+#ifdef DEBUGPUMP
+  Serial.println(msg);
+#endif
   return msg;
 }
 
 /*
- * build the status message which is returned when pump status is required
+ * Build the status message which is returned when pump status is required
  */
 char *pumpGetStatusMsg(pPumpInfo pump, char *msg, size_t len){
   snprintf(msg, len, 
@@ -163,26 +173,10 @@ char *pumpGetStatusMsg(pPumpInfo pump, char *msg, size_t len){
 }
 
 
-// $PTMP,1,20,checksum[CR][LF]
-// $PTMP,2,19,checksum[CR][LF]
-// $PTMP,3,10,checksum[CR][LF]
-// $PTMP,4,15,checksum[CR][LF]
-
-// Batteri
-// $PBAT,1,24.9,checksum[CR][LF]
-// $PBAT,2,12.4,checksum[CR][LF]
-
-// Pumper
-// $PPMP,1,1,checksum[CR][LF]     (pump 1 is on (1))
-// $PPMP,2,0,checksum[CR][LF]     (pump 2 is off (0))
-
-
-// eller, enda enklere
-// $PTMP,20,19,10,15,checksum[CR][LF]  (Temperatures are 20, 19, 10, 15 deg)
-// $PBAT,12.4,24.9,checksum[CR][LF]     (battery voltages are 12.4V and 24.9V)
-// $PPMP,1,0,checksum[CR][LF]  (pump 1 is on, pump 2 is off)
-
-
+/*
+ * Builds a string with to send as NMEA sentence
+ * Don't modify the string outside this file.
+ */
 char *pumpGetNMEA(int n, ...){
   va_list arguments;                     
   pPumpInfo p;
@@ -191,20 +185,23 @@ char *pumpGetNMEA(int n, ...){
   char *ptr = nmea;
   
   va_start(arguments, n);
-  snprintf(ptr, len, "$PMP,%d", n);
+  snprintf(ptr, len, "$PPMP");
   ptr += strlen(ptr);
   len -= strlen(ptr);
   
   for (i=0; i<n; i++){
     p = va_arg ( arguments, pPumpInfo);
-    snprintf(ptr, len, "%d", p->status);
+#ifdef DEBUGPUMP
+    Serial.print("pumpnmea "); Serial.print(p->name); Serial.println(p->status);
+#endif
+    snprintf(ptr, len, ",%d", p->status);
     ptr += strlen(ptr);
     len -= strlen(ptr);
   }
   va_end(arguments);
 
   uint32_t checksum = CRC32::checksum(nmea, strlen(nmea));
-  snprintf(ptr, len, "*%d\r\n", checksum);
+  snprintf(ptr, len, "*%d", checksum);
 
   return nmea;
 }

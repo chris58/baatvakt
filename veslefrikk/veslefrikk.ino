@@ -6,7 +6,57 @@
 #include "units.h" // includes pumps, temperatures and batteries
 #include "alarmhandler.h"
 
+//#define DEBUG_VESLEFRIKK
 ///////////////////////
+/* Telia earlier known as "NetCom" supports GSM, GPRS, EDGE, UMTS, HSDPA and LTE technologies. */
+/*     APN name: telia  */
+
+/* Telenor supports GSM, GPRS, EDGE, UMTS and HSDPA technologies. */
+/*     APN name: Telenor  */
+
+/* Network Norway supports GSM, GPRS and EDGE technologies. */
+/*     username: (blank) (or) wap */
+/*     password: (blank) (or) wap */
+/*     APN name: internet  */
+
+/* My Call It is a Service Provider, it operates in Mobile Norway/Telenor network and supports GSM and UMTS technologies. */
+/*     APN name: internet  */
+
+/* One Call It is a Service Provider, it operates in Mobile Norway(Tele2)/Telenor network and supports GSM and UMTS technologies. */
+/*     username: nwn (or) (blank) */
+/*     password: nwn (or) (blank) */
+/*     APN name: internet  */
+
+/* Chess It is an MVNO, it operates in NetCom network and supports GSM and UMTS technologies. */
+/*     username: chess */
+/*     password: chess */
+/*     APN name: netcom  */
+
+/* djuice It is an MVNO operating in Telenor Mobil network and supporting GSM and UMTS technologies. */
+/*     username: dj */
+/*     password: dj */
+/*     APN name: wap  */
+
+/* Tele2 It is an MNO, it operates in Mobile Norway(Tele2 owned) network and has NRA(National roaming agreement) with the NetCom network, supports GSM and UMTS technologies. */
+/*     APN name: internet.tele2.no (or) mobileinternet.tele2.no */
+/*     MMS Settings: APN internet.tele2.no, MMSC: http://mmsc.tele2.no, Proxy: 193.12.40.14, Proxy port: 8080  */
+
+/* Telio It is an MVNO operating in Telenor Mobil network and supporting GSM and UMTS technologies. */
+/*     APN name: internet.ventelo.no  */
+
+/* TalkMore It is an MVNO, it operates in Telenor network, supports GSM and UMTS technologies. */
+/*     username: (blank) (or) telenor */
+/*     password: (blank) (or) telenor */
+/*     APN name: telenor  */
+
+/* MobiTalk It is an MVNO, it operates in Telenor Mobil network, supports GSM and UMTS technologies. */
+/*     username: DJ */
+/*     password: DJ */
+/*     APN name: telenor  */
+
+/* Ventelo It is an MVNO, it operates in Telenor Mobil network, supports GSM and UMTS technologies. */
+/*     APN name: internet.ventelo.no  */
+//////////////////////////
 
 typedef struct{
   unsigned long time;
@@ -39,6 +89,7 @@ int alarmCode = ALARM_OFF;
 
 // Modem stuff
 const uint8_t IMEI[15] = {48,49,51,57,53,48,48,48,55,50,54,49,52,50,52};
+// SIM900A IMEI=013950007261424          TAC: 013950 FAC: 00 SNR: 726142 CD: 4
 char msg[160];
 int send_SMS = 1;
 unsigned long alarmRepeatInterval = 900UL; // seconds
@@ -75,13 +126,14 @@ static volatile unsigned long seconds = 0;
 static volatile bool checkSMS = false;
 static volatile bool doUpdate = false;
 static volatile bool sendData = false;
+static volatile bool sendNMEA = false;
 
 #define SMS_INTERVAL    5 //seconds
 #define UPDATE_INTERVAL 2 //seconds
-#define SEND_INTERVAL 600 //seconds
+#define SEND_INTERVAL 600 //seconds = 10 minutes
+#define NMEA_INTERVAL   2 //seconds
 
 void setup(){ 
-  //initSystem();
   Serial.begin(57600);
   Serial.println("*********************");
   Serial.println("* Booting Baatvakta *");
@@ -95,6 +147,7 @@ void setup(){
   digitalWrite(LED_RED, HIGH); // red on
   digitalWrite(LED_GREEN, LOW); // green off
 
+  // depth communication. Not used/working so far :-(
   Serial1.begin(9600);
   Serial2.begin(9600);
   
@@ -106,10 +159,11 @@ void setup(){
    ********************************************************/
 
   // temperatures
-  pTIcabin = temperatureAddTemperatureProbe(daBow, "Lugar", 0, 40, TEMP_9_BIT);
-  pTIengine = temperatureAddTemperatureProbe(daEngine, "Maskinrom", 0, 50, TEMP_9_BIT);
-  pTIaft = temperatureAddTemperatureProbe(daAft, "Akterlugar", 0, 40, TEMP_9_BIT);
-  pTIout = temperatureAddTemperatureProbe(daOut, "Ute", 0, 40, TEMP_9_BIT);
+  temperatureInit(4); // init 
+  pTIcabin = temperatureAddTemperatureProbe(daBow, "Cabin", 0, 40, TEMP_9_BIT);
+  pTIengine = temperatureAddTemperatureProbe(daEngine, "Engine", 0, 50, TEMP_9_BIT);
+  pTIaft = temperatureAddTemperatureProbe(daAft, "Aft", 0, 40, TEMP_9_BIT);
+  pTIout = temperatureAddTemperatureProbe(daOut, "Outside", 0, 40, TEMP_9_BIT);
 
   // the pumps
   // More than 5 minutes ON and more than 60 minutes OFF will give an alarm
@@ -123,18 +177,18 @@ void setup(){
   Serial.print("/");
   Serial.println(dtostrf(float(aoff), 10, 1, xxx));
 #endif
-  pPumpEngine = pumpInit(NULL, "Maskinrom", PUMPENGINE_PIN, aon, aoff);
+  pPumpEngine = pumpInit(NULL, "Engine", PUMPENGINE_PIN, aon, aoff);
 #ifdef DEBUG_VESLEFRIKK
   Serial.print("in pump struct aon/aoff=");
   Serial.print(dtostrf(float(pPumpEngine->alarmDurationOn), 10, 1, xxx));
   Serial.print("/");
   Serial.println(dtostrf(float(pPumpEngine->alarmDurationOff), 10, 1, xxx));
 #endif
-  pPumpAft = pumpInit(NULL, "Akterlugar", PUMPAFT_PIN, aon, aoff);
+  pPumpAft = pumpInit(NULL, "Aft", PUMPAFT_PIN, aon, aoff);
 
   // batteries
-  pBattery12V = batteryInit(NULL, "12V Batteri", BATTERY12V_PIN, (13.12/844.0), 12);
-  pBattery24V = batteryInit(NULL, "24V Batteri", BATTERY24V_PIN, (27.51/932.0), 24);
+  pBattery12V = batteryInit(NULL, "12V Bat", BATTERY12V_PIN, (13.12/844.0), 12);
+  pBattery24V = batteryInit(NULL, "24V Bat", BATTERY24V_PIN, (27.51/932.0), 24);
 
   initTimer();
   delay(500);
@@ -162,29 +216,51 @@ void loop(){
   data_union bdUnion;
   float v;
   char vs[12];
+  char *s;
 
   if (doUpdate){
     doUpdate = false;
     // pump in engine room
     alarmCode = pumpUpdate(pPumpEngine);
-    handlePumpAlarm(pPumpEngine, alarmCode);
+    if ((s = handleAlarm((pUnitInfo) pPumpEngine, alarmCode, msg, sizeof(msg))) != NULL)
+      sendAlarmMsg(s);
     // pump in the aft
     alarmCode = pumpUpdate(pPumpAft);
-    handlePumpAlarm(pPumpAft, alarmCode);
+    if ((s = handleAlarm((pUnitInfo) pPumpAft, alarmCode, msg, sizeof(msg))) != NULL)
+      sendAlarmMsg(s);
 
     // Battery 12V
     alarmCode = batteryUpdate(pBattery12V);
-    handleBatteryAlarm(pBattery12V, alarmCode);
+    if ((s = handleAlarm((pUnitInfo) pBattery12V, alarmCode, msg, sizeof(msg))) != NULL){
+      sendAlarmMsg(s);
+    }
     // Battery 24V
     alarmCode = batteryUpdate(pBattery24V);
-    handleBatteryAlarm(pBattery24V, alarmCode);
+    if ((s = handleAlarm((pUnitInfo) pBattery24V, alarmCode, msg, sizeof(msg))) != NULL)
+      sendAlarmMsg(s);
 
+    // Temperatures
     temperaturesUpdate();
+    pTemperatureInfo ti = NULL;
+    while((ti = temperatureGetNextTempInfo(ti)) != NULL){ 
+      if ((s = handleAlarm((pUnitInfo) ti, ti->alarmCode, msg, sizeof(msg))) != NULL)
+	sendAlarmMsg(s);
+    } 
+    lastTimeSMSsendt = getSeconds();
   }
   
+  if (sendNMEA){
+    sendNMEA = false;
+    // NMEA
+    Serial.println(pumpGetNMEA(2, pPumpEngine, pPumpAft));
+    Serial.println(batteryGetNMEA(2, pBattery12V, pBattery24V));
+    Serial.println(temperatureGetNMEA());
+  }
+  /*  
+  // send data to server
   if (sendData){
     sendData = false;
-    // timestamp
+    // get timestamp
     bdUnion.baatvaktData.time = getUnixTime();
 
     // values
@@ -200,10 +276,10 @@ void loop(){
     bdUnion.baatvaktData.pumpAftDuration = pumpResetPeriod(pPumpAft);
 
     // Alarms
-    bdUnion.baatvaktData.alarmTCabin = ALARM_OFF;
-    bdUnion.baatvaktData.alarmTCabin = ALARM_OFF;
-    bdUnion.baatvaktData.alarmTCabin = ALARM_OFF;
-    bdUnion.baatvaktData.alarmTCabin = ALARM_OFF;
+    bdUnion.baatvaktData.alarmTCabin = temperatureGetAlarmCode(pTIcabin);
+    bdUnion.baatvaktData.alarmTEngine = temperatureGetAlarmCode(pTIengine);
+    bdUnion.baatvaktData.alarmTAft = temperatureGetAlarmCode(pTIaft);
+    bdUnion.baatvaktData.alarmTOutside = temperatureGetAlarmCode(pTIout);
 
     bdUnion.baatvaktData.alarmVoltage12 = batteryGetAlarmCode(pBattery12V);
     bdUnion.baatvaktData.alarmVoltage24 = batteryGetAlarmCode(pBattery24V);
@@ -213,21 +289,24 @@ void loop(){
 
     // send the data... ;-)
   }
-
+*/
   //Check whether there are unread messages on the SIM card
   if (checkSMS){
     checkSMS = false;
     sms_nr=sms.IsSMSPresent(SMS_UNREAD);
     if (sms_nr){
       // read new SMS
+#ifdef DEBUG_VESLEFRIKK
       Serial.print("SMS msg number: ");
-      Serial.println(sms_nr,DEC);
+      Serial.println(sms_nr, DEC);
+#endif
       // parse the sms
       sms.GetSMS(sms_nr, phone_number, sms_text, 100);
       
+#ifdef DEBUG_VESLEFRIKK
       Serial.println(phone_number);
       Serial.println(sms_text);
-
+#endif
       if (sms_text[0] == 'P' || sms_text[0] == 'p'){
 	snprintf(msg, sizeof(msg), 
 		 "Pumper\n"
@@ -309,12 +388,11 @@ void loop(){
 		 "DONOFF on-duration off-duration"
 		 );
       }
-#ifdef DEBUG
+#ifdef DEBUG_VESLEFRIKK
       Serial.println(msg);
 #endif
       // Return an SMS
-      if (sms.SendSMS(phone_number, msg)) 
-	Serial.println("\nSMS sent OK"); 
+      sms.SendSMS(phone_number, msg);
       
       // Delete the incoming sms
       sms.DeleteSMS(sms_nr);
@@ -334,46 +412,53 @@ ISR(TIMER1_COMPA_vect){
   if(seconds%UPDATE_INTERVAL == 0){
     doUpdate = true;
   }
+  if(seconds%NMEA_INTERVAL == 0){
+    sendNMEA = true;
+  }
   if(seconds > SEND_INTERVAL){
     sendData = true;
   }
 }
 
-void handlePumpAlarm(pPumpInfo pump, short alarmCode){
-  Serial.print("Handle pump alarm ");
-  Serial.println(pump->name);
+/* void handlePumpAlarm(pPumpInfo pump, short alarmCode){ */
+/* #ifdef DEBUG */
+/*   Serial.print("Handle pump alarm "); */
+/*   Serial.println(pump->name); */
+/* #endif */
+/*   if (alarmCode != ALARM_OFF){ */
+/*     if (!alarmIsAcknowledged(pump, alarmCode)){ */
+/*       int id = alarmAdd(pump, alarmCode); */
+/*       pumpGetAlarmMsg(pump, msg, sizeof(msg)); */
+/*       snprintf(msg, sizeof(msg), "%s\n To acknowledge reply\nACK %d\n", msg, id); */
+/*       sendAlarmMsg(msg); */
+/*     } */
+/*   }else{ */
+/*     // make sure that there is no alarm left in the alarm list */
+/*     alarmRemove(pump, alarmCode); */
+/*   } */
+/* } */
 
-  if (alarmCode != ALARM_OFF){
-    if (!alarmIsAcknowledged(pump, alarmCode)){
-      int id = alarmAdd(pump, alarmCode);
-      pumpGetAlarmMsg(pump, msg, sizeof(msg));
-      snprintf(msg, sizeof(msg), "%s\n To acknowledge reply\nACK %d\n", msg, id);
-      sendAlarmMsg(msg);
-    }
-  }else{
-    // make sure that there is no alarm left in the alarm list
-    alarmRemove(pump, alarmCode);
-  }
-}
+/* /\* */
+/*  * react on battery alarm */
+/*  *\/ */
+/* void handleBatteryAlarm(pBatteryInfo bat, short alarmCode){ */
+/* #ifdef DEBUG_VESLEFRIKK */
+/*   Serial.print("Handle battery alarm "); */
+/*   Serial.println(bat->name); */
+/* #endif */
+/*   if (alarmCode != ALARM_OFF){ */
+/*     if (!alarmIsAcknowledged(bat, alarmCode)){ */
+/*       int id = alarmAdd(bat, alarmCode); */
+/*       batteryGetAlarmMsg(bat, msg, sizeof(msg)); */
+/*       snprintf(msg, sizeof(msg), "%s\n To acknowledge reply\nACK %d\n", msg, id); */
+/*       sendAlarmMsg(msg); */
+/*     } */
+/*   }else{ */
+/*     // make sure that there is no alarm left in the alarm list */
+/*     alarmRemove(bat, alarmCode); */
+/*   } */
+/* } */
 
-/*
- * react on battery alarm
- */
-void handleBatteryAlarm(pBatteryInfo bat, short alarmCode){
-  Serial.print("Handle battery alarm ");
-  Serial.println(bat->name);
-  if (alarmCode != ALARM_OFF){
-    if (!alarmIsAcknowledged(bat, alarmCode)){
-      int id = alarmAdd(bat, alarmCode);
-      batteryGetAlarmMsg(bat, msg, sizeof(msg));
-      snprintf(msg, sizeof(msg), "%s\n To acknowledge reply\nACK %d\n", msg, id);
-      sendAlarmMsg(msg);
-    }
-  }else{
-    // make sure that there is no alarm left in the alarm list
-    alarmRemove(bat, alarmCode);
-  }
-}
 
 /*
  * Send an alarm message if alarmRepeatInterval seconds have past
@@ -383,7 +468,6 @@ void sendAlarmMsg(char *msg){
     return;
   if ((getSeconds() - lastTimeSMSsendt) > alarmRepeatInterval || lastTimeSMSsendt > getSeconds() || lastTimeSMSsendt == 0){
     sms.SendSMS("93636390", msg);
-    lastTimeSMSsendt = getSeconds();
   }
 }
 
@@ -464,8 +548,7 @@ unsigned long getUnixTime(){
     if (gsm.IsStringReceived("OK")) {
       // perfect - we have some response, but what:
       status = RX_FINISHED;
-      break; // so finish receiving immediately and let's go to
-      // to check response
+      break; // so finish receiving immediately and check response
     }
     status = gsm.IsRxFinished();
   } while (status == RX_NOT_FINISHED);

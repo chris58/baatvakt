@@ -10,7 +10,7 @@ typedef struct{
   uint8_t typeID;
   char name[12];
   int alarmCode;
-} unitInto_t, *pUnitInfo;
+} unitInfo_t, *pUnitInfo;
 
 #define ALARM_OFF 0
 

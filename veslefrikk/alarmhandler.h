@@ -10,7 +10,7 @@ typedef struct{
 
 //alarmCode here again? Or remove in units.h??
 
-#define MAX_ALARMS 5
+#define MAX_ALARMS 6
 #define ALARM_ERROR -1
 
 int alarmIsAcknowledged(void *unit, short alarmCode);
@@ -18,5 +18,6 @@ int alarmRemove(void *unit, short alarmCode);
 int alarmAdd(void *unit, short alarmCode);
 void alarmAcknowledgeById(int id);
 char *alarmGetActiveAlarmsAsString(char *buf, int buflen);
+char *handleAlarm(pUnitInfo unit, short alarmCode, char *msg, size_t len);
 
 #endif
