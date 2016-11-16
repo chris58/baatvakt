@@ -151,7 +151,7 @@ char *alarmGetActiveAlarmsAsString(char *buf, int buflen){
 }
 
 /*
- * If no alarm remove eventual entry in alarm list
+ * If no alarm, remove eventual entry in alarm list
  * Otherwise get a string from the appropriate unit and return it.
  */
 char *handleAlarm(pUnitInfo unit, short alarmCode, char *msg, size_t len){

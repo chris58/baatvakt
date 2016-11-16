@@ -194,14 +194,13 @@ char *pumpGetNMEA(int n, ...){
 #ifdef DEBUGPUMP
     Serial.print("pumpnmea "); Serial.print(p->name); Serial.println(p->status);
 #endif
-    snprintf(ptr, len, ",%d", p->status);
+    snprintf(ptr, len, ",%d,%d", pumpIsRunning(p), pumpGetAlarm(p));
     ptr += strlen(ptr);
     len -= strlen(ptr);
   }
   va_end(arguments);
 
-  uint32_t checksum = CRC32::checksum(nmea, strlen(nmea));
-  snprintf(ptr, len, "*%d", checksum);
+  snprintf(ptr, len, "*%02X", nmeaCheckSum(nmea, strlen(nmea)));
 
   return nmea;
 }

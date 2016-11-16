@@ -73,7 +73,7 @@ char* batteryGetVoltageAsString(pBatteryInfo bat, char *voltageS){
  * Quick and dirty guess...
  */
 int batteryIsCharging(pBatteryInfo bat){
-  return (batteryGetVoltage(bat) >= (bat->lowAlarmVoltage + 2));
+  return (batteryGetVoltage(bat) >= (bat->lowAlarmVoltage + 1.5));
 }
 
 /*
@@ -105,7 +105,10 @@ char *batteryGetAlarmMsg(pBatteryInfo bat, char *msg, size_t len){
   return msg;
 }
 
-
+/*
+ * construct NMEA message for <n> pBatteryInfo s.
+ * Returns a local string nmea. Don't mess with it outside this scope.
+ */
 char *batteryGetNMEA(int n, ...){
   va_list arguments;                     
   pBatteryInfo bat;
@@ -120,15 +123,15 @@ char *batteryGetNMEA(int n, ...){
   len -= strlen(ptr);
   
   for (i=0; i<n; i++){
-    bat = va_arg ( arguments, pBatteryInfo);
-    snprintf(ptr, len, ",%s", batteryGetVoltageAsString(bat, voltageS));
+    bat = va_arg (arguments, pBatteryInfo);
+    snprintf(ptr, len, ",%s,%d", batteryGetVoltageAsString(bat, voltageS),
+	     batteryGetAlarmCode(bat));
     ptr += strlen(ptr);
     len -= strlen(ptr);
   }
   va_end(arguments);
 
-  uint32_t checksum = CRC32::checksum(nmea, strlen(nmea));
-  snprintf(ptr, len, "*%d", checksum);
+  snprintf(ptr, len, "*%02X", nmeaCheckSum(nmea, strlen(nmea)));
 
   return nmea;
 }

@@ -1,7 +1,7 @@
 #ifndef UNITS_H
 #define UNITS_H
 
-#include <CRC32.h>
+#include "nmeaCheckSum.h"
 #include "pump.h"
 #include "battery.h"
 #include "temperature1wire.h"

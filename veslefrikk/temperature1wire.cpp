@@ -1,7 +1,6 @@
 #include "units.h"
 
 #define ONEWIRE_PIN 13
-//#define PROBE_MAX 4 // number of temperature probes. In our case there are 4.
 
 static OneWire oneWire1(ONEWIRE_PIN);
 static DallasTemperature sensors1(&oneWire1);
@@ -10,13 +9,7 @@ static pTemperatureInfo *pti; //pti[PROBE_MAX];
 static int probeCount = 0;
 
 static int maxProbe; // maximum number of temperature probes.
-static char nmea[48];
-
-// static void initDallas(){
-//   sensors1.begin();
-//   memset(pti, NULL, sizeof(pti));
-//   _isInit = 1;
-// }
+static char nmea[128];
 
 /*
  * Allocate memory for an array of 'n' temperature devices. Init the DallasTemperature library
@@ -24,7 +17,6 @@ static char nmea[48];
 void temperatureInit(int n){
   pti = (pTemperatureInfo *) calloc(n, sizeof(pTemperatureInfo));
   sensors1.begin();
-  //  memset(pti, NULL, sizeof(pti));
   _isInit = 1;
   maxProbe = n;
 }
@@ -138,14 +130,13 @@ char *temperatureGetNMEA(){
   
   for (i=0; i<maxProbe; i++){
     if (pti[i] != NULL){
-      snprintf(ptr, len, ",%d", (int) pti[i]->value);
+      snprintf(ptr, len, ",%d,%d", (int) temperatureGetTempC(pti[i]), temperatureGetAlarmCode(pti[i]));
       ptr += strlen(ptr);
       len -= strlen(ptr);
     }
   }
 
-  uint32_t checksum = CRC32::checksum(nmea, strlen(nmea));
-  snprintf(ptr, len, "*%d", checksum);
+  snprintf(ptr, len, "*%02X", nmeaCheckSum(nmea, strlen(nmea)));
 
   return nmea;
 }

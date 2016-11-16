@@ -57,26 +57,25 @@
 /* Ventelo It is an MVNO, it operates in Telenor Mobil network, supports GSM and UMTS technologies. */
 /*     APN name: internet.ventelo.no  */
 //////////////////////////
-
 typedef struct{
   unsigned long time;
   float tCabin;
   float tEngine;
-  float tAft;
+  float tStern;
   float tOutside;
   float voltage12;
   float voltage24;
   unsigned long pumpEngineDuration;
-  unsigned long pumpAftDuration;
+  unsigned long pumpSternDuration;
 
   unsigned char alarmTCabin;
   unsigned char alarmTEngine;
-  unsigned char alarmTAft;
+  unsigned char alarmTStern;
   unsigned char alarmTOutside;
   unsigned char alarmVoltage12;
   unsigned char alarmVoltage24;
   unsigned char alarmPumpEngine;
-  unsigned char alarmPumpAft;
+  unsigned char alarmPumpStern;
 } baatvaktData_t, *pBaatvaktData;
 
 typedef union {
@@ -84,15 +83,16 @@ typedef union {
   unsigned char bytes[sizeof(baatvaktData_t)];
 } data_union;
  
-
-int alarmCode = ALARM_OFF;
+// Info on how to send multipart sms messages...
+// http://mobiletidings.com/2009/02/18/combining-sms-messages/
+//
 
 // Modem stuff
 const uint8_t IMEI[15] = {48,49,51,57,53,48,48,48,55,50,54,49,52,50,52};
 // SIM900A IMEI=013950007261424          TAC: 013950 FAC: 00 SNR: 726142 CD: 4
 char msg[160];
 int send_SMS = 1;
-unsigned long alarmRepeatInterval = 900UL; // seconds
+unsigned long alarmRepeatInterval = 3600UL; // seconds = 1 hour
 SMSGSM sms;
 
 // Green and red LED
@@ -107,18 +107,18 @@ pBatteryInfo pBattery24V;
 
 // Pump stuff
 #define PUMPENGINE_PIN 11
-#define PUMPAFT_PIN 10
+#define PUMPSTERN_PIN 10
 pPumpInfo pPumpEngine;
-pPumpInfo pPumpAft;
+pPumpInfo pPumpStern;
 
 // Temperature stuff
 pTemperatureInfo pTIcabin;
 pTemperatureInfo pTIengine;
-pTemperatureInfo pTIaft;
+pTemperatureInfo pTIstern;
 pTemperatureInfo pTIout;
 DeviceAddress daBow    = { 0x28, 0x0A, 0xC5, 0x4F, 0x07, 0x00, 0x00, 0x21 }; 
 DeviceAddress daEngine = { 0x28, 0x57, 0x5A, 0x50, 0x07, 0x00, 0x00, 0x3F };
-DeviceAddress daAft    = { 0x28, 0xA2, 0x2B, 0x4B, 0x07, 0x00, 0x00, 0xAA }; 
+DeviceAddress daStern    = { 0x28, 0xA2, 0x2B, 0x4B, 0x07, 0x00, 0x00, 0xAA }; 
 DeviceAddress daOut    = { 0x28, 0x91, 0xCF, 0x50, 0x07, 0x00, 0x00, 0x77 };
 
 //////////
@@ -162,7 +162,7 @@ void setup(){
   temperatureInit(4); // init 
   pTIcabin = temperatureAddTemperatureProbe(daBow, "Cabin", 0, 40, TEMP_9_BIT);
   pTIengine = temperatureAddTemperatureProbe(daEngine, "Engine", 0, 50, TEMP_9_BIT);
-  pTIaft = temperatureAddTemperatureProbe(daAft, "Aft", 0, 40, TEMP_9_BIT);
+  pTIstern = temperatureAddTemperatureProbe(daStern, "Stern", 0, 40, TEMP_9_BIT);
   pTIout = temperatureAddTemperatureProbe(daOut, "Outside", 0, 40, TEMP_9_BIT);
 
   // the pumps
@@ -184,7 +184,7 @@ void setup(){
   Serial.print("/");
   Serial.println(dtostrf(float(pPumpEngine->alarmDurationOff), 10, 1, xxx));
 #endif
-  pPumpAft = pumpInit(NULL, "Aft", PUMPAFT_PIN, aon, aoff);
+  pPumpStern = pumpInit(NULL, "Stern", PUMPSTERN_PIN, aon, aoff);
 
   // batteries
   pBattery12V = batteryInit(NULL, "12V Bat", BATTERY12V_PIN, (13.12/844.0), 12);
@@ -193,30 +193,46 @@ void setup(){
   initTimer();
   delay(500);
   
-  sms.SendSMS("93636390", "Baatvakta SMS version on Veslefrikk started");
+  sms.SendSMS("93636390", "Baatvakta on Veslefrikk started");
 
   digitalWrite(LED_RED, LOW); // red led off
   digitalWrite(LED_GREEN, HIGH); // green led on
 }
 
+// Last time an alarm message has been send
 static unsigned long lastTimeSMSsendt = 0;
+static int alarmSend = 0;
  
+/*
+ * Convert a string to upper case
+ */
+char *toUpper(char *s){
+  int l = strlen(s);
+  int i;
+  for (i=0; i<l; i++)
+    s[i] = toupper(s[i]);
+  return s;
+}
 
+/* 
+ * The main loop
+ */
 void loop(){ 
-  char *txt;
   char voltage12S[7] = "";
   char voltage24S[7] = "";
-  int alarmID;
   unsigned int don;
   unsigned int doff;
   // modem
   char sms_text[160];
-  char phone_number[20]; // array for the phone number string
+  char phoneNumber[20]; // array for the phone number string
   char sms_nr;
-  data_union bdUnion;
   float v;
   char vs[12];
   char *s;
+  int alarmCode = ALARM_OFF;
+  int alarmID;
+
+  data_union bdUnion;
 
   if (doUpdate){
     doUpdate = false;
@@ -224,9 +240,9 @@ void loop(){
     alarmCode = pumpUpdate(pPumpEngine);
     if ((s = handleAlarm((pUnitInfo) pPumpEngine, alarmCode, msg, sizeof(msg))) != NULL)
       sendAlarmMsg(s);
-    // pump in the aft
-    alarmCode = pumpUpdate(pPumpAft);
-    if ((s = handleAlarm((pUnitInfo) pPumpAft, alarmCode, msg, sizeof(msg))) != NULL)
+    // pump in the stern
+    alarmCode = pumpUpdate(pPumpStern);
+    if ((s = handleAlarm((pUnitInfo) pPumpStern, alarmCode, msg, sizeof(msg))) != NULL)
       sendAlarmMsg(s);
 
     // Battery 12V
@@ -245,51 +261,54 @@ void loop(){
     while((ti = temperatureGetNextTempInfo(ti)) != NULL){ 
       if ((s = handleAlarm((pUnitInfo) ti, ti->alarmCode, msg, sizeof(msg))) != NULL)
 	sendAlarmMsg(s);
-    } 
-    lastTimeSMSsendt = getSeconds();
+    }
+    if (alarmSend){
+      lastTimeSMSsendt = getSeconds();
+      alarmSend = 0;
+    }
   }
   
   if (sendNMEA){
     sendNMEA = false;
     // NMEA
-    Serial.println(pumpGetNMEA(2, pPumpEngine, pPumpAft));
+    Serial.println(pumpGetNMEA(2, pPumpEngine, pPumpStern));
     Serial.println(batteryGetNMEA(2, pBattery12V, pBattery24V));
     Serial.println(temperatureGetNMEA());
   }
   /*  
   // send data to server
   if (sendData){
-    sendData = false;
-    // get timestamp
-    bdUnion.baatvaktData.time = getUnixTime();
+  sendData = false;
+  // get timestamp
+  bdUnion.baatvaktData.time = getUnixTime();
 
-    // values
-    bdUnion.baatvaktData.tCabin = temperatureGetTempC(pTIcabin);
-    bdUnion.baatvaktData.tEngine = temperatureGetTempC(pTIengine);
-    bdUnion.baatvaktData.tAft = temperatureGetTempC(pTIaft);
-    bdUnion.baatvaktData.tOutside = temperatureGetTempC(pTIout);
+  // values
+  bdUnion.baatvaktData.tCabin = temperatureGetTempC(pTIcabin);
+  bdUnion.baatvaktData.tEngine = temperatureGetTempC(pTIengine);
+  bdUnion.baatvaktData.tStern = temperatureGetTempC(pTIstern);
+  bdUnion.baatvaktData.tOutside = temperatureGetTempC(pTIout);
 
-    bdUnion.baatvaktData.voltage12 = batteryGetVoltage(pBattery12V);
-    bdUnion.baatvaktData.voltage24 = batteryGetVoltage(pBattery24V);
+  bdUnion.baatvaktData.voltage12 = batteryGetVoltage(pBattery12V);
+  bdUnion.baatvaktData.voltage24 = batteryGetVoltage(pBattery24V);
 
-    bdUnion.baatvaktData.pumpEngineDuration = pumpResetPeriod(pPumpEngine);
-    bdUnion.baatvaktData.pumpAftDuration = pumpResetPeriod(pPumpAft);
+  bdUnion.baatvaktData.pumpEngineDuration = pumpResetPeriod(pPumpEngine);
+  bdUnion.baatvaktData.pumpSternDuration = pumpResetPeriod(pPumpStern);
 
-    // Alarms
-    bdUnion.baatvaktData.alarmTCabin = temperatureGetAlarmCode(pTIcabin);
-    bdUnion.baatvaktData.alarmTEngine = temperatureGetAlarmCode(pTIengine);
-    bdUnion.baatvaktData.alarmTAft = temperatureGetAlarmCode(pTIaft);
-    bdUnion.baatvaktData.alarmTOutside = temperatureGetAlarmCode(pTIout);
+  // Alarms
+  bdUnion.baatvaktData.alarmTCabin = temperatureGetAlarmCode(pTIcabin);
+  bdUnion.baatvaktData.alarmTEngine = temperatureGetAlarmCode(pTIengine);
+  bdUnion.baatvaktData.alarmTStern = temperatureGetAlarmCode(pTIstern);
+  bdUnion.baatvaktData.alarmTOutside = temperatureGetAlarmCode(pTIout);
 
-    bdUnion.baatvaktData.alarmVoltage12 = batteryGetAlarmCode(pBattery12V);
-    bdUnion.baatvaktData.alarmVoltage24 = batteryGetAlarmCode(pBattery24V);
+  bdUnion.baatvaktData.alarmVoltage12 = batteryGetAlarmCode(pBattery12V);
+  bdUnion.baatvaktData.alarmVoltage24 = batteryGetAlarmCode(pBattery24V);
 
-    bdUnion.baatvaktData.alarmPumpEngine = pumpGetAlarm(pPumpEngine);
-    bdUnion.baatvaktData.alarmPumpAft = pumpGetAlarm(pPumpAft);
+  bdUnion.baatvaktData.alarmPumpEngine = pumpGetAlarm(pPumpEngine);
+  bdUnion.baatvaktData.alarmPumpStern = pumpGetAlarm(pPumpStern);
 
-    // send the data... ;-)
+  // send the data... ;-)
   }
-*/
+  */
   //Check whether there are unread messages on the SIM card
   if (checkSMS){
     checkSMS = false;
@@ -301,15 +320,21 @@ void loop(){
       Serial.println(sms_nr, DEC);
 #endif
       // parse the sms
-      sms.GetSMS(sms_nr, phone_number, sms_text, 100);
-      
+      sms.GetSMS(sms_nr, phoneNumber, sms_text, sizeof(sms_text));
 #ifdef DEBUG_VESLEFRIKK
-      Serial.println(phone_number);
+      Serial.println(phoneNumber);
       Serial.println(sms_text);
 #endif
-      if (sms_text[0] == 'P' || sms_text[0] == 'p'){
+      toUpper(sms_text);
+#ifdef DEBUG_VESLEFRIKK
+      Serial.println(sms_text);
+#endif
+
+
+      // Request pump status
+      if (sms_text[0] == 'P'){
 	snprintf(msg, sizeof(msg), 
-		 "Pumper\n"
+		 "Pumps\n"
 		 "%s %s for %d sec\n" 
 		 " last on %d sec\n"  
 		 " last off %d sec\n"
@@ -321,62 +346,102 @@ void loop(){
 		 (int) (pumpGetCurrentStateDuration(pPumpEngine)),// / 1000.0),
 		 (int) (pPumpEngine->durationON), // /1000),
 		 (int) (pPumpEngine->durationOFF), // /1000),
-		 pPumpAft->name,
-		 ((pPumpAft->status == PUMPON)? "ON" : "OFF"),
-		 (int) (pumpGetCurrentStateDuration(pPumpAft)), // / 1000.0),
-		 (int) (pPumpAft->durationON), // /1000.0),
-		 (int) (pPumpAft->durationOFF) // /1000.0)
+		 pPumpStern->name,
+		 ((pPumpStern->status == PUMPON)? "ON" : "OFF"),
+		 (int) (pumpGetCurrentStateDuration(pPumpStern)), // / 1000.0),
+		 (int) (pPumpStern->durationON), // /1000.0),
+		 (int) (pPumpStern->durationOFF) // /1000.0)
 		 );
-      }else if (sms_text[0] == 'T' || sms_text[0] == 't'){
+
+	// Request temperatures
+      }else if (sms_text[0] == 'T'){
 	snprintf(msg, sizeof(msg), 
-		 "Temperaturer:\n"
+		 "Temperatures:\n"
 		 " %s: %+3d\n"
 		 " %s: %+3d\n"
 		 " %s: %+3d\n"
 		 " %s: %+3d\n",
 		 pTIcabin->name, (int) temperatureGetTempC(pTIcabin),
 		 pTIengine->name, (int) temperatureGetTempC(pTIengine),
-		 pTIaft->name, (int) temperatureGetTempC(pTIaft),
+		 pTIstern->name, (int) temperatureGetTempC(pTIstern),
 		 pTIout->name, (int) temperatureGetTempC(pTIout)
 		 );
+
+	// Set low voltage alarm for 12V
       }else if (sscanf(sms_text, "BAT12 %s", vs) == 1){ 
 	char *x = "";
 	v = strtod(vs, &x);
       	snprintf(msg, sizeof(msg), "Setting\n" 
-      		 "Battery 12V Alarm voltage=%s V\n",
+      		 "12V low voltage alarm = %sV\n",
       		 vs); 
        	batterySetLowVoltageAlarm(pBattery12V, v); 
+
+	// Set low voltage alarm for 24V
       }else if (sscanf(sms_text, "BAT24 %s", vs) == 1){ 
 	char *x = "";
 	v = strtod(vs, &x);
       	snprintf(msg, sizeof(msg), "Setting\n" 
-      		 "Battery 24V Alarm voltage=%s V\n",
+      		 "24V low voltage alarm = %sV\n",
       		 vs); 
        	batterySetLowVoltageAlarm(pBattery24V, v); 
-      }else if (sms_text[0] == 'B' || sms_text[0] == 'b'){
+
+	// Request battery status
+      }else if (sms_text[0] == 'B'){
 	snprintf(msg, sizeof(msg),
-		 "Batterier\n"
+		 "Batteries\n"
 		 " %s: %s\n"
 		 " %s: %s\n",
 		 pBattery12V->name, batteryGetVoltageAsString(pBattery12V, voltage12S),
 		 pBattery24V->name, batteryGetVoltageAsString(pBattery24V, voltage24S)
 		 );
+
+	// Add phone number
+      }else if (sscanf(sms_text, "ADD %[+,0-9]", s) == 1){
+	if (strcmp(phoneNumber, "93636390") == 0){
+	  snprintf(msg, sizeof(msg), 
+		   "Adding phone %s to list\n",
+		   s);
+	}else{
+	  snprintf(msg, sizeof(msg), 
+		   "Only root can do this\n");
+	}
+	
+	// Remove phone number
+      }else if (sscanf(sms_text, "REM %[+,0-9]", s) == 1){
+	if (strcmp(phoneNumber, "93636390") == 0){
+	  snprintf(msg, sizeof(msg), 
+		   "Removing phone %s from list\n",
+		   s);
+	}else{
+	  snprintf(msg, sizeof(msg), 
+		   "Only root can do this\n");
+	}
+
+	// Acknowledge alarm
       }else if (sscanf(sms_text, "ACK %d", &alarmID) == 1){
 	alarmAcknowledgeById(alarmID);
 	snprintf(msg, sizeof(msg), 
 		 "Alarm %d acknowledged\n",
 		 alarmID);
-      }else if (sms_text[0] == 'A' || sms_text[0] == 'a'){
+
+	// Request alarm list
+      }else if (sms_text[0] == 'A'){
 	alarmGetActiveAlarmsAsString(msg, sizeof(msg));
+
+	// Switch sms alarm on/off
       }else if (sscanf(sms_text, "SMS %d", &send_SMS) == 1){
 	snprintf(msg, sizeof(msg), "Sending of alarm SMS %s\n",
 		 (send_SMS > 0) ? "enabled" : "disabled");
+
+	// Set duration for pump alarm (on and off)
       }else if (sscanf(sms_text, "DONOFF %d %d", &don, &doff) == 2){
 	snprintf(msg, sizeof(msg), "Setting\n"
 		 "DurationOnAlarm=%d seconds\n"
 		 "DurationOffAlarm=%d seconds\n",
 		 don, doff);
 	pumpSetAlarmDurations(pPumpEngine, don, doff);
+
+	// Send 'help' sms
       }else{
 	snprintf(msg, sizeof(msg), "Send\n"
 		 "T for temps\n"
@@ -392,14 +457,17 @@ void loop(){
       Serial.println(msg);
 #endif
       // Return an SMS
-      sms.SendSMS(phone_number, msg);
+      sms.SendSMS(phoneNumber, msg);
       
       // Delete the incoming sms
       sms.DeleteSMS(sms_nr);
       
-    } else {
+    }
+#ifdef DEBUG_VESLEFRIKK
+    else {
       Serial.println("Having a break");
     }     
+#endif
   }
 }
 
@@ -466,8 +534,14 @@ ISR(TIMER1_COMPA_vect){
 void sendAlarmMsg(char *msg){
   if (send_SMS <= 0)
     return;
+#ifdef DEBUG_VESLEFRIKK  
+  Serial.print("lastTimeSMSsendt=");
+  Serial.println(lastTimeSMSsendt);
+  Serial.print("getSeconds()="); Serial.println(getSeconds());
+#endif
   if ((getSeconds() - lastTimeSMSsendt) > alarmRepeatInterval || lastTimeSMSsendt > getSeconds() || lastTimeSMSsendt == 0){
     sms.SendSMS("93636390", msg);
+    alarmSend = 1;
   }
 }
 
@@ -505,7 +579,7 @@ void initTimerOld(){
  * 
  * http://www.instructables.com/id/Arduino-Timer-Interrupts/
  * see http://www.instructables.com/id/Arduino-Timer-Interrupts/step2/Structuring-Timer-Interrupts
-*/
+ */
 void initTimer(){
   cli();//stop interrupts
   //set timer1 interrupt at 1Hz
@@ -557,14 +631,16 @@ unsigned long getUnixTime(){
 	
   //...\n+CCLK: "16/10/30,11:48:06+04\nOK\n..."
   int ret = sscanf(s, "%*[^\"]\"%d/%d/%d,%d:%d:%d%*s",
-	 &tm.Year,
-	 &tm.Month,		
-	 &tm.Day,
-	 &tm.Hour,
-	 &tm.Minute,
-	 &tm.Second);
+		   &tm.Year,
+		   &tm.Month,		
+		   &tm.Day,
+		   &tm.Hour,
+		   &tm.Minute,
+		   &tm.Second);
 
   tm.Year += (2000 -1970); // Unix time started 1.1.1970..
   //Using Time.h library to convert from date time to Unix time
   return makeTime(tm); //Return Unix time as unsigned long
 }
+
+
