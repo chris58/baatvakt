@@ -1,7 +1,6 @@
 #include "units.h"
 
 static char nmea[48];
-static char hhmmss[11];
 
 //#define DEBUGPUMP
 
