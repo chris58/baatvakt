@@ -37,6 +37,6 @@ unsigned long pumpResetPeriod(pPumpInfo pump);
 char *pumpGetAlarmMsg(pPumpInfo pump, char *msg, size_t len);
 char *pumpGetStatusMsg(pPumpInfo pump, char *msg, size_t len);
 char *pumpGetNMEA(int n, ...);
-char *seconds2hhmmss(long sec);
+char *seconds2hhmmss(char *buf, long sec);
 
 #endif

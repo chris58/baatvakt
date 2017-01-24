@@ -13,8 +13,9 @@ static char hhmmss[11];
 int pumpUpdate(pPumpInfo pump){
   unsigned long now = getSeconds();
 #ifdef DEBUGPUMP
+  char hhmmss[11];
   Serial.print("Time: ");
-  Serial.println(seconds2hhmmss(now));
+  Serial.println(seconds2hhmmss(hhmmss, now));
   Serial.print(pump->name);
   Serial.print(" raw ");
   Serial.println(analogRead(pump->pin));
@@ -144,11 +145,12 @@ char *pumpGetAlarmMsg(pPumpInfo pump, char *msg, size_t len){
   Serial.print("pumpGetAlarmmsg "); Serial.println(pump->alarmCode);
 #endif
   if (pump->alarmCode == ALARM_DURATION_ON || pump->alarmCode == ALARM_DURATION_OFF){
+    char buf[11];
     snprintf(msg, len, 
 	     "ALARM:\nPump %s has been %s for %s\n",
 	     pump->name,
 	     ((pump->status == PUMPON)? "ON" : "OFF"),
-	     seconds2hhmmss(pumpGetCurrentStateDuration(pump))
+	     seconds2hhmmss(buf, pumpGetCurrentStateDuration(pump))
 	     );
   }else if (pump->alarmCode == ALARM_LOW_DURATION_OFF){
     snprintf(msg, len, 
@@ -173,15 +175,18 @@ char *pumpGetAlarmMsg(pPumpInfo pump, char *msg, size_t len){
  * Build the status message which is returned when pump status is required
  */
 char *pumpGetStatusMsg(pPumpInfo pump, char *msg, size_t len){
+  char buf1[11];
+  char buf2[11];
+
   snprintf(msg, len, 
 	   "%s has been %s for %s\n" 
 	   " last on for %d sec\n"  
 	   " last off for %s\n",
 	   pump->name,
 	   ((pump->status == PUMPON)? "ON" : "OFF"),
-	   seconds2hhmmss(pumpGetCurrentStateDuration(pump)), 
+	   seconds2hhmmss(buf1, pumpGetCurrentStateDuration(pump)), 
 	   (int) (pump->durationON), 
-	   seconds2hhmmss(pump->durationOFF)
+	   seconds2hhmmss(buf2, pump->durationOFF)
 	   );
   return msg;
 }
@@ -219,11 +224,14 @@ char *pumpGetNMEA(int n, ...){
   return nmea;
 }
 
-char *seconds2hhmmss(long sec){
+/*
+ * buf must be at least of size 10, 9 chars plus \0 
+ */
+char *seconds2hhmmss(char *buf, long sec){
   int hh = sec/3600;
   int mm = (sec - hh*3600)/60;
   int ss = sec - hh*3600-mm*60;
 
-  snprintf(hhmmss, 10, "%02dh%02dm%02ds", hh, mm, ss);
+  snprintf(buf, 10, "%02dh%02dm%02ds", hh, mm, ss);
   return hhmmss;
 }

@@ -163,8 +163,6 @@ void alarmSetAutoAcknowledge(int onoff){
     }
   }
   autoAcknowledge = onoff; // set it to new value
-}
-
   return;
 }
 
