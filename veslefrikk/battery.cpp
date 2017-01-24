@@ -101,7 +101,7 @@ char *batteryGetAlarmMsg(pBatteryInfo bat, char *msg, size_t len){
 	     bat->name
 	     );
   }
-  //Serial.println(msg);
+
   return msg;
 }
 

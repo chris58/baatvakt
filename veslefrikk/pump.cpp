@@ -1,6 +1,7 @@
 #include "units.h"
 
 static char nmea[48];
+static char hhmmss[11];
 
 //#define DEBUGPUMP
 
@@ -12,6 +13,8 @@ static char nmea[48];
 int pumpUpdate(pPumpInfo pump){
   unsigned long now = getSeconds();
 #ifdef DEBUGPUMP
+  Serial.print("Time: ");
+  Serial.println(seconds2hhmmss(now));
   Serial.print(pump->name);
   Serial.print(" raw ");
   Serial.println(analogRead(pump->pin));
@@ -25,6 +28,9 @@ int pumpUpdate(pPumpInfo pump){
       pump->durationOFF = (now - pump->last);
       pump->last = now;
       pump->status = PUMPON;
+      if (pump->durationOFF <= pump->alarmLowDurationOff){
+	pump->alarmCode = ALARM_LOW_DURATION_OFF;
+      }
     }else{ // is still on
       if ((now - pump->last) > pump->alarmDurationOn){
 	pump->alarmCode = ALARM_DURATION_ON;
@@ -71,9 +77,10 @@ int pumpUpdate(pPumpInfo pump){
 /*
  * Set maximum time for pump durations ON/OFF in seconds
  */
-void pumpSetAlarmDurations(pPumpInfo pump, unsigned long alarmDurationOn, unsigned long alarmDurationOff){
-  pump->alarmDurationOn = alarmDurationOn; // * 1000L;
-  pump->alarmDurationOff = alarmDurationOff; // * 1000L;
+void pumpSetAlarmDurations(pPumpInfo pump, unsigned long alarmDurationOn, unsigned long alarmLowDurationOff, unsigned long alarmDurationOff){
+  pump->alarmDurationOn = alarmDurationOn;
+  pump->alarmLowDurationOff = alarmLowDurationOff; 
+  pump->alarmDurationOff = alarmDurationOff;
 }
 
 /*
@@ -92,7 +99,7 @@ unsigned long pumpResetPeriod(pPumpInfo pump){
  * Initialize a new pump. If pPumpInfo is null allocate memory for it.
  * Return initialized pPumpInfo (pointer to pumpInfo_t).
  */
-pPumpInfo pumpInit(pPumpInfo pi, char *name, uint8_t pin, unsigned int alarmDurationOn, unsigned int alarmDurationOff){
+pPumpInfo pumpInit(pPumpInfo pi, char *name, uint8_t pin, unsigned int alarmDurationOn, unsigned int alarmLowDurationOff, unsigned int alarmHighDurationOff){
   pPumpInfo pump;
   
   if (pi != NULL){
@@ -112,8 +119,9 @@ pPumpInfo pumpInit(pPumpInfo pi, char *name, uint8_t pin, unsigned int alarmDura
   pump->durationLastPeriod = 0;
   pump->durationThisPeriod = 0;
   pump->status = (analogRead(pump->pin) > 512) ? PUMPON : PUMPOFF;
-  pump->alarmDurationOn = alarmDurationOn;// * 1000L;
-  pump->alarmDurationOff = alarmDurationOff;// * 1000L;
+  pump->alarmDurationOn = alarmDurationOn;
+  pump->alarmLowDurationOff = alarmLowDurationOff;
+  pump->alarmDurationOff = alarmHighDurationOff;
   pump->typeID = PUMP;
   pump->alarmCode = ALARM_OFF;
  
@@ -135,13 +143,18 @@ char *pumpGetAlarmMsg(pPumpInfo pump, char *msg, size_t len){
 #ifdef DEBUGPUMP
   Serial.print("pumpGetAlarmmsg "); Serial.println(pump->alarmCode);
 #endif
-  if (pump->alarmCode != ALARM_OFF){
+  if (pump->alarmCode == ALARM_DURATION_ON || pump->alarmCode == ALARM_DURATION_OFF){
     snprintf(msg, len, 
-	     "ALARM:\nPump %s has been %s for %d sec\n",
+	     "ALARM:\nPump %s has been %s for %s\n",
 	     pump->name,
 	     ((pump->status == PUMPON)? "ON" : "OFF"),
-	     (int) (pumpGetCurrentStateDuration(pump)) // / 1000.0)
+	     seconds2hhmmss(pumpGetCurrentStateDuration(pump))
 	     );
+  }else if (pump->alarmCode == ALARM_LOW_DURATION_OFF){
+    snprintf(msg, len, 
+	     "ALARM:\nPump %s has only been off for %d sec\n",
+	     pump->name,
+	     pump->durationOFF);
   }else{
     snprintf(msg, len, 
 	     "Status for pump %s is ok\n",
@@ -155,19 +168,20 @@ char *pumpGetAlarmMsg(pPumpInfo pump, char *msg, size_t len){
   return msg;
 }
 
+
 /*
  * Build the status message which is returned when pump status is required
  */
 char *pumpGetStatusMsg(pPumpInfo pump, char *msg, size_t len){
   snprintf(msg, len, 
-	   "%s has been %s for %d sec\n" 
+	   "%s has been %s for %s\n" 
 	   " last on for %d sec\n"  
-	   " last off for %d sec\n",
+	   " last off for %s\n",
 	   pump->name,
 	   ((pump->status == PUMPON)? "ON" : "OFF"),
-	   (int) (pumpGetCurrentStateDuration(pump)), // / 1000.0),
-	   (int) (pump->durationON), // /1000),
-	   (int) (pump->durationOFF) // /1000)
+	   seconds2hhmmss(pumpGetCurrentStateDuration(pump)), 
+	   (int) (pump->durationON), 
+	   seconds2hhmmss(pump->durationOFF)
 	   );
   return msg;
 }
@@ -205,3 +219,11 @@ char *pumpGetNMEA(int n, ...){
   return nmea;
 }
 
+char *seconds2hhmmss(long sec){
+  int hh = sec/3600;
+  int mm = (sec - hh*3600)/60;
+  int ss = sec - hh*3600-mm*60;
+
+  snprintf(hhmmss, 10, "%02dh%02dm%02ds", hh, mm, ss);
+  return hhmmss;
+}

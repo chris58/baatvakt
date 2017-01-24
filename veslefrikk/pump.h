@@ -6,6 +6,7 @@
 #define PUMPOFF 0
 #define ALARM_DURATION_ON 1
 #define ALARM_DURATION_OFF 2
+#define ALARM_LOW_DURATION_OFF 4
 
 typedef struct{
   uint8_t typeID;
@@ -21,19 +22,21 @@ typedef struct{
   long durationLastPeriod;
   unsigned long alarmDurationOn;
   unsigned long alarmDurationOff;
+  unsigned long alarmLowDurationOff;
 } pumpInfo_t, *pPumpInfo;
 
 #define pumpIsRunning(pump) (pump->status)
 #define pumpGetName(pump) (pump->name)
 #define pumpGetAlarm(pump) (pump->alarmCode)
 
-pPumpInfo pumpInit(pPumpInfo p, char *name, uint8_t pin, unsigned int alarmDurationOn, unsigned int alarmDurationOff);
-
+pPumpInfo pumpInit(pPumpInfo p, char *name, uint8_t pin, unsigned int alarmDurationOn, unsigned int alarmLowDurationOff, unsigned int alarmHighDurationOff);
 int pumpUpdate(pPumpInfo pump);
 long pumpGetCurrentStateDuration(pPumpInfo pump);
-void pumpSetAlarmDurations(pPumpInfo pump, unsigned long alarmDurationOn, unsigned long alarmDurationOff);
+void pumpSetAlarmDurations(pPumpInfo pump, unsigned long alarmDurationOn, unsigned long alarmLowDurationOff, unsigned long alarmHighDurationOff);
 unsigned long pumpResetPeriod(pPumpInfo pump);
 char *pumpGetAlarmMsg(pPumpInfo pump, char *msg, size_t len);
+char *pumpGetStatusMsg(pPumpInfo pump, char *msg, size_t len);
 char *pumpGetNMEA(int n, ...);
+char *seconds2hhmmss(long sec);
 
 #endif

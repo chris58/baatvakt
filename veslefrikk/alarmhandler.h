@@ -16,8 +16,9 @@ typedef struct{
 int alarmIsAcknowledged(void *unit, short alarmCode);
 int alarmRemove(void *unit, short alarmCode);
 int alarmAdd(void *unit, short alarmCode);
-void alarmAcknowledgeById(int id);
+int alarmAcknowledgeById(int id);
 char *alarmGetActiveAlarmsAsString(char *buf, int buflen);
+void alarmSetAutoAcknowledge(int onoff);
 char *handleAlarm(pUnitInfo unit, short alarmCode, char *msg, size_t len);
 
 #endif

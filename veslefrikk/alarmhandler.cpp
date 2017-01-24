@@ -10,6 +10,8 @@
  */
 static pAlarmInfo alarmList[MAX_ALARMS];// = (pAlarmInfo *) calloc(MAX_ALARMS, sizeof(pAlarmInfo *));
 
+static int autoAcknowledge = 0;
+
 /*
  * find out whether an alarm has been acknowledged (by SMS)
  */
@@ -73,6 +75,8 @@ int alarmAdd(void *unit, short alarmCode){
       pAlarmInfo ai = (pAlarmInfo) calloc(1, sizeof(alarmInfo_t));
       ai->unit = unit;
       ai->alarmCode = alarmCode;
+      if (autoAcknowledge)
+	ai->acknowledged = 1;
       alarmList[i] = ai;
       return i;
     }
@@ -85,7 +89,7 @@ int alarmAdd(void *unit, short alarmCode){
  * Acknowledge an alarm at inidex id. If acknowledged no more further SMS will be send.
  * Called when SMS with "ACK id" recieved, where 0<=id<MAX_ALARMS
  */
-void alarmAcknowledgeById(int id){
+int alarmAcknowledgeById(int id){
   if (id >=0 && id < MAX_ALARMS && alarmList[id] != NULL){
     alarmList[id]->acknowledged = 1;
     return id;
@@ -150,6 +154,20 @@ char *alarmGetActiveAlarmsAsString(char *buf, int buflen){
   return buf;
 }
 
+void alarmSetAutoAcknowledge(int onoff){
+  if (!autoAcknowledge){ // autoAck is switched from off to on
+    // acknowledge every alarm
+    int i;
+    for (i=0; i<MAX_ALARMS; i++){
+      alarmAcknowledgeById(i);
+    }
+  }
+  autoAcknowledge = onoff; // set it to new value
+}
+
+  return;
+}
+
 /*
  * If no alarm, remove eventual entry in alarm list
  * Otherwise get a string from the appropriate unit and return it.
@@ -179,7 +197,7 @@ char *handleAlarm(pUnitInfo unit, short alarmCode, char *msg, size_t len){
     }
   }
 
-  if (strlen(msg) > 0){
+  if (strlen(msg) > 0 && !autoAcknowledge){
     snprintf(msg, len, "%s\n To acknowledge reply\nACK %d\n", msg, id);
     //sendAlarmMsg(msg);
 #ifdef DEBUG_ALARM

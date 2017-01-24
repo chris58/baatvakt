@@ -1,6 +1,6 @@
 #include <Time.h>
 #include <avr/wdt.h>
-#include <GSM.h>
+#include <GSMmega.h>
 #include <sms.h>
 
 #include "units.h" // includes pumps, temperatures and batteries
@@ -56,18 +56,24 @@
 
 /* Ventelo It is an MVNO, it operates in Telenor Mobil network, supports GSM and UMTS technologies. */
 /*     APN name: internet.ventelo.no  */
-//////////////////////////
+
+/**
+ * The block of data which is transfered to the server
+ */
 typedef struct{
-  unsigned long time;
-  float tCabin;
-  float tEngine;
-  float tStern;
-  float tOutside;
-  float voltage12;
-  float voltage24;
+  unsigned long time; /**< a timestamp in Unix format */
+  // temperatures
+  float tCabin;       /**< temperature in the cabin */
+  float tEngine;      /**< temperature in the engine room */
+  float tStern;       /**< stern cabin temperature */
+  float tOutside;     /**< outside temperature */
+  // battery voltages
+  float voltage12;    /**< actual voltage of 12V batteries */
+  float voltage24;    /**< actual voltage of 24V batteries */
+  // pumping durations
   unsigned long pumpEngineDuration;
   unsigned long pumpSternDuration;
-
+  // current alarm codes
   unsigned char alarmTCabin;
   unsigned char alarmTEngine;
   unsigned char alarmTStern;
@@ -91,7 +97,7 @@ typedef union {
 const uint8_t IMEI[15] = {48,49,51,57,53,48,48,48,55,50,54,49,52,50,52};
 // SIM900A IMEI=013950007261424          TAC: 013950 FAC: 00 SNR: 726142 CD: 4
 char msg[160];
-int send_SMS = 1;
+int alarmSMSenabled = 1;
 unsigned long alarmRepeatInterval = 3600UL; // seconds = 1 hour
 SMSGSM sms;
 
@@ -166,25 +172,13 @@ void setup(){
   pTIout = temperatureAddTemperatureProbe(daOut, "Outside", 0, 40, TEMP_9_BIT);
 
   // the pumps
-  // More than 5 minutes ON and more than 60 minutes OFF will give an alarm
+  // More than 5 minutes ON, less than 1 minute OFF and more than 60 minutes OFF will give an alarm
   unsigned long aon = 5L*60L;
+  unsigned long aLowoff = 60L;
   unsigned long aoff = 60L*60L;
  
-#ifdef DEBUG_VESLEFRIKK
-  Serial.print("aon/aoff=");
-  char xxx[20] = "";
-  Serial.print(dtostrf(float(aon), 10, 1, xxx));
-  Serial.print("/");
-  Serial.println(dtostrf(float(aoff), 10, 1, xxx));
-#endif
-  pPumpEngine = pumpInit(NULL, "Engine", PUMPENGINE_PIN, aon, aoff);
-#ifdef DEBUG_VESLEFRIKK
-  Serial.print("in pump struct aon/aoff=");
-  Serial.print(dtostrf(float(pPumpEngine->alarmDurationOn), 10, 1, xxx));
-  Serial.print("/");
-  Serial.println(dtostrf(float(pPumpEngine->alarmDurationOff), 10, 1, xxx));
-#endif
-  pPumpStern = pumpInit(NULL, "Stern", PUMPSTERN_PIN, aon, aoff);
+  pPumpEngine = pumpInit(NULL, "Engine", PUMPENGINE_PIN, aon, aLowoff, aoff);
+  pPumpStern = pumpInit(NULL, "Stern", PUMPSTERN_PIN, aon, aLowoff, aoff);
 
   // batteries
   pBattery12V = batteryInit(NULL, "12V Bat", BATTERY12V_PIN, (13.12/844.0), 12);
@@ -201,9 +195,10 @@ void setup(){
 
 // Last time an alarm message has been send
 static unsigned long lastTimeSMSsendt = 0;
+// has an alarm been send?
 static int alarmSend = 0;
  
-/*
+/**
  * Convert a string to upper case
  */
 char *toUpper(char *s){
@@ -214,7 +209,7 @@ char *toUpper(char *s){
   return s;
 }
 
-/* 
+/**
  * The main loop
  */
 void loop(){ 
@@ -222,15 +217,18 @@ void loop(){
   char voltage24S[7] = "";
   unsigned int don;
   unsigned int doff;
+  unsigned int dLowOff;
   // modem
   char sms_text[160];
   char phoneNumber[20]; // array for the phone number string
+  char phoneNumber2[20]; // array for another phone number string
   char sms_nr;
   float v;
   char vs[12];
   char *s;
   int alarmCode = ALARM_OFF;
   int alarmID;
+  int onoff;
 
   data_union bdUnion;
 
@@ -268,47 +266,47 @@ void loop(){
     }
   }
   
+  // NMEA
   if (sendNMEA){
     sendNMEA = false;
-    // NMEA
     Serial.println(pumpGetNMEA(2, pPumpEngine, pPumpStern));
     Serial.println(batteryGetNMEA(2, pBattery12V, pBattery24V));
     Serial.println(temperatureGetNMEA());
   }
-  /*  
+  
   // send data to server
   if (sendData){
-  sendData = false;
-  // get timestamp
-  bdUnion.baatvaktData.time = getUnixTime();
+    sendData = false;
+    // get timestamp
+    bdUnion.baatvaktData.time = getUnixTime();
 
-  // values
-  bdUnion.baatvaktData.tCabin = temperatureGetTempC(pTIcabin);
-  bdUnion.baatvaktData.tEngine = temperatureGetTempC(pTIengine);
-  bdUnion.baatvaktData.tStern = temperatureGetTempC(pTIstern);
-  bdUnion.baatvaktData.tOutside = temperatureGetTempC(pTIout);
+    // values
+    bdUnion.baatvaktData.tCabin = temperatureGetTempC(pTIcabin);
+    bdUnion.baatvaktData.tEngine = temperatureGetTempC(pTIengine);
+    bdUnion.baatvaktData.tStern = temperatureGetTempC(pTIstern);
+    bdUnion.baatvaktData.tOutside = temperatureGetTempC(pTIout);
 
-  bdUnion.baatvaktData.voltage12 = batteryGetVoltage(pBattery12V);
-  bdUnion.baatvaktData.voltage24 = batteryGetVoltage(pBattery24V);
+    bdUnion.baatvaktData.voltage12 = batteryGetVoltage(pBattery12V);
+    bdUnion.baatvaktData.voltage24 = batteryGetVoltage(pBattery24V);
 
-  bdUnion.baatvaktData.pumpEngineDuration = pumpResetPeriod(pPumpEngine);
-  bdUnion.baatvaktData.pumpSternDuration = pumpResetPeriod(pPumpStern);
+    bdUnion.baatvaktData.pumpEngineDuration = pumpResetPeriod(pPumpEngine);
+    bdUnion.baatvaktData.pumpSternDuration = pumpResetPeriod(pPumpStern);
 
-  // Alarms
-  bdUnion.baatvaktData.alarmTCabin = temperatureGetAlarmCode(pTIcabin);
-  bdUnion.baatvaktData.alarmTEngine = temperatureGetAlarmCode(pTIengine);
-  bdUnion.baatvaktData.alarmTStern = temperatureGetAlarmCode(pTIstern);
-  bdUnion.baatvaktData.alarmTOutside = temperatureGetAlarmCode(pTIout);
+    // Alarms
+    bdUnion.baatvaktData.alarmTCabin = temperatureGetAlarmCode(pTIcabin);
+    bdUnion.baatvaktData.alarmTEngine = temperatureGetAlarmCode(pTIengine);
+    bdUnion.baatvaktData.alarmTStern = temperatureGetAlarmCode(pTIstern);
+    bdUnion.baatvaktData.alarmTOutside = temperatureGetAlarmCode(pTIout);
 
-  bdUnion.baatvaktData.alarmVoltage12 = batteryGetAlarmCode(pBattery12V);
-  bdUnion.baatvaktData.alarmVoltage24 = batteryGetAlarmCode(pBattery24V);
+    bdUnion.baatvaktData.alarmVoltage12 = batteryGetAlarmCode(pBattery12V);
+    bdUnion.baatvaktData.alarmVoltage24 = batteryGetAlarmCode(pBattery24V);
 
-  bdUnion.baatvaktData.alarmPumpEngine = pumpGetAlarm(pPumpEngine);
-  bdUnion.baatvaktData.alarmPumpStern = pumpGetAlarm(pPumpStern);
+    bdUnion.baatvaktData.alarmPumpEngine = pumpGetAlarm(pPumpEngine);
+    bdUnion.baatvaktData.alarmPumpStern = pumpGetAlarm(pPumpStern);
 
-  // send the data... ;-)
+    // send the data... ;-)
   }
-  */
+  
   //Check whether there are unread messages on the SIM card
   if (checkSMS){
     checkSMS = false;
@@ -329,29 +327,18 @@ void loop(){
 #ifdef DEBUG_VESLEFRIKK
       Serial.println(sms_text);
 #endif
-
-
+      
+      s = msg;
+      int len = sizeof(msg);
       // Request pump status
       if (sms_text[0] == 'P'){
-	snprintf(msg, sizeof(msg), 
-		 "Pumps\n"
-		 "%s %s for %d sec\n" 
-		 " last on %d sec\n"  
-		 " last off %d sec\n"
-		 "%s %s for %d sec \n"
-		 " last on %d sec\n"
-		 " last off %d sec\n",
-		 pPumpEngine->name,
-		 ((pPumpEngine->status == PUMPON)? "ON" : "OFF"),
-		 (int) (pumpGetCurrentStateDuration(pPumpEngine)),// / 1000.0),
-		 (int) (pPumpEngine->durationON), // /1000),
-		 (int) (pPumpEngine->durationOFF), // /1000),
-		 pPumpStern->name,
-		 ((pPumpStern->status == PUMPON)? "ON" : "OFF"),
-		 (int) (pumpGetCurrentStateDuration(pPumpStern)), // / 1000.0),
-		 (int) (pPumpStern->durationON), // /1000.0),
-		 (int) (pPumpStern->durationOFF) // /1000.0)
-		 );
+	strcpy(s, "Pumps\n");
+	s += strlen(s);
+	len -= strlen(s);
+	pumpGetStatusMsg(pPumpEngine, s, len);
+	s += strlen(s);
+	len -= strlen(s);
+	pumpGetStatusMsg(pPumpStern, s, len);
 
 	// Request temperatures
       }else if (sms_text[0] == 'T'){
@@ -395,23 +382,23 @@ void loop(){
 		 pBattery24V->name, batteryGetVoltageAsString(pBattery24V, voltage24S)
 		 );
 
-	// Add phone number
-      }else if (sscanf(sms_text, "ADD %[+,0-9]", s) == 1){
+	// Add phone number 
+     }else if (sscanf(sms_text, "ADD %s", phoneNumber2) == 1){
 	if (strcmp(phoneNumber, "93636390") == 0){
 	  snprintf(msg, sizeof(msg), 
 		   "Adding phone %s to list\n",
-		   s);
+		   phoneNumber2);
 	}else{
 	  snprintf(msg, sizeof(msg), 
 		   "Only root can do this\n");
 	}
 	
 	// Remove phone number
-      }else if (sscanf(sms_text, "REM %[+,0-9]", s) == 1){
+      }else if (sscanf(sms_text, "REM %", phoneNumber2) == 1){
 	if (strcmp(phoneNumber, "93636390") == 0){
 	  snprintf(msg, sizeof(msg), 
 		   "Removing phone %s from list\n",
-		   s);
+		   phoneNumber2);
 	}else{
 	  snprintf(msg, sizeof(msg), 
 		   "Only root can do this\n");
@@ -424,22 +411,31 @@ void loop(){
 		 "Alarm %d acknowledged\n",
 		 alarmID);
 
+	// Set auto-acknowledge 
+      }else if (sscanf(sms_text, "AUTOACK %d", &onoff) == 1){
+	alarmSetAutoAcknowledge(onoff);
+	snprintf(msg, sizeof(msg), 
+		 "Auto-Acknowledge is now %s\n",
+		 ((onoff)? "ON" : "OFF"));
+
 	// Request alarm list
       }else if (sms_text[0] == 'A'){
 	alarmGetActiveAlarmsAsString(msg, sizeof(msg));
 
 	// Switch sms alarm on/off
-      }else if (sscanf(sms_text, "SMS %d", &send_SMS) == 1){
+      }else if (sscanf(sms_text, "SMS %d", &alarmSMSenabled) == 1){
 	snprintf(msg, sizeof(msg), "Sending of alarm SMS %s\n",
-		 (send_SMS > 0) ? "enabled" : "disabled");
+		 (alarmSMSenabled > 0) ? "enabled" : "disabled");
 
 	// Set duration for pump alarm (on and off)
-      }else if (sscanf(sms_text, "DONOFF %d %d", &don, &doff) == 2){
+      }else if (sscanf(sms_text, "DONOFF %d %d %d", &don, &dLowOff, &doff) == 3){
 	snprintf(msg, sizeof(msg), "Setting\n"
-		 "DurationOnAlarm=%d seconds\n"
-		 "DurationOffAlarm=%d seconds\n",
-		 don, doff);
-	pumpSetAlarmDurations(pPumpEngine, don, doff);
+		 "Duration ON Alarm=%d sec\n"
+		 "Duration Off Alarm (low)=%d sec\n",
+		 "Duration Off Alarm (high)=%d sec\n",
+		 don, dLowOff, doff);
+	pumpSetAlarmDurations(pPumpEngine, don, dLowOff, doff);
+	pumpSetAlarmDurations(pPumpStern, don, dLowOff, doff);
 
 	// Send 'help' sms
       }else{
@@ -450,7 +446,7 @@ void loop(){
 		 "A for active alarms\n"
 		 "ACK n where n=alarm idx\n"
 		 "SMS 0/1 to turn off/on SMS\n"
-		 "DONOFF on-duration off-duration"
+		 "DONOFF on-duration off-low-duration off-duration"
 		 );
       }
 #ifdef DEBUG_VESLEFRIKK
@@ -471,68 +467,11 @@ void loop(){
   }
 }
 
-// Called every second 
-ISR(TIMER1_COMPA_vect){
-  seconds++;
-  if(seconds%SMS_INTERVAL == 0){
-    checkSMS = true;
-  }
-  if(seconds%UPDATE_INTERVAL == 0){
-    doUpdate = true;
-  }
-  if(seconds%NMEA_INTERVAL == 0){
-    sendNMEA = true;
-  }
-  if(seconds > SEND_INTERVAL){
-    sendData = true;
-  }
-}
-
-/* void handlePumpAlarm(pPumpInfo pump, short alarmCode){ */
-/* #ifdef DEBUG */
-/*   Serial.print("Handle pump alarm "); */
-/*   Serial.println(pump->name); */
-/* #endif */
-/*   if (alarmCode != ALARM_OFF){ */
-/*     if (!alarmIsAcknowledged(pump, alarmCode)){ */
-/*       int id = alarmAdd(pump, alarmCode); */
-/*       pumpGetAlarmMsg(pump, msg, sizeof(msg)); */
-/*       snprintf(msg, sizeof(msg), "%s\n To acknowledge reply\nACK %d\n", msg, id); */
-/*       sendAlarmMsg(msg); */
-/*     } */
-/*   }else{ */
-/*     // make sure that there is no alarm left in the alarm list */
-/*     alarmRemove(pump, alarmCode); */
-/*   } */
-/* } */
-
-/* /\* */
-/*  * react on battery alarm */
-/*  *\/ */
-/* void handleBatteryAlarm(pBatteryInfo bat, short alarmCode){ */
-/* #ifdef DEBUG_VESLEFRIKK */
-/*   Serial.print("Handle battery alarm "); */
-/*   Serial.println(bat->name); */
-/* #endif */
-/*   if (alarmCode != ALARM_OFF){ */
-/*     if (!alarmIsAcknowledged(bat, alarmCode)){ */
-/*       int id = alarmAdd(bat, alarmCode); */
-/*       batteryGetAlarmMsg(bat, msg, sizeof(msg)); */
-/*       snprintf(msg, sizeof(msg), "%s\n To acknowledge reply\nACK %d\n", msg, id); */
-/*       sendAlarmMsg(msg); */
-/*     } */
-/*   }else{ */
-/*     // make sure that there is no alarm left in the alarm list */
-/*     alarmRemove(bat, alarmCode); */
-/*   } */
-/* } */
-
-
 /*
  * Send an alarm message if alarmRepeatInterval seconds have past
  */
 void sendAlarmMsg(char *msg){
-  if (send_SMS <= 0)
+  if (alarmSMSenabled <= 0)
     return;
 #ifdef DEBUG_VESLEFRIKK  
   Serial.print("lastTimeSMSsendt=");
@@ -561,19 +500,6 @@ void reboot() {
   wdt_disable();
 }
 
-void initTimerOld(){
-  cli();            			
-  TCCR1A = 0;
-  TCCR1B = 0;
-  OCR1A = 15624;
-  TCCR1B |= (1 << WGM12);
-  TCCR1B |= (1 << CS10);
-  TCCR1B |= (1 << CS12);
-  TIMSK1 |= (1 << OCIE1A);
-  sei();  
-}
-
-
 /* 
  * Start timer interrupts
  * 
@@ -597,6 +523,26 @@ void initTimer(){
   TIMSK1 |= (1 << OCIE1A);
   sei();//allow interrupts
 }
+
+/*
+ * This is the function which is called every second by the timer
+ */
+ISR(TIMER1_COMPA_vect){
+  seconds++;
+  if(seconds%SMS_INTERVAL == 0){
+    checkSMS = true;
+  }
+  if(seconds%UPDATE_INTERVAL == 0){
+    doUpdate = true;
+  }
+  if(seconds%NMEA_INTERVAL == 0){
+    sendNMEA = true;
+  }
+  if(seconds > SEND_INTERVAL){
+    sendData = true;
+  }
+}
+
 
 /*
  * Returns Unix time from SIM900
@@ -641,6 +587,31 @@ unsigned long getUnixTime(){
   tm.Year += (2000 -1970); // Unix time started 1.1.1970..
   //Using Time.h library to convert from date time to Unix time
   return makeTime(tm); //Return Unix time as unsigned long
+}
+
+/*
+ * Execute an AT command and return whatever it returns
+ * Used to execute a command by SMS. Might leave SIM900 in an undefined state
+ * if not used carefully.
+ */
+char *executeAT(char *cmd){
+  byte status;
+
+  gsm.SimpleWriteln(cmd);
+  // 5 sec. for initial comm tmout
+  // and max. 1500 msec. for inter character timeout
+  gsm.RxInit(5000, 1500);
+  // wait response is finished
+  do {
+    if (gsm.IsStringReceived("OK")) {
+      status = RX_FINISHED;
+      break; // finish receiving
+    }
+    status = gsm.IsRxFinished();
+  } while (status == RX_NOT_FINISHED);
+
+  // return what we received. Don't mess with it outside
+  return (char *)gsm.comm_buf;
 }
 
 
