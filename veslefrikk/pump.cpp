@@ -1,10 +1,12 @@
 #include "units.h"
 
 static char nmea[48];
+static char buf1[11];
+static char buf2[11];
 
 //#define DEBUGPUMP
 
-/*
+/**
  * update pump, i.e. check whether ON or OFF and calculate corresponding durations.
  * In case an alarm duration is exceeded return the alarm code,
  * otherwise return ALARM_OFF
@@ -74,7 +76,7 @@ int pumpUpdate(pPumpInfo pump){
   return pump->alarmCode;
 }
 
-/*
+/**
  * Set maximum time for pump durations ON/OFF in seconds
  */
 void pumpSetAlarmDurations(pPumpInfo pump, unsigned long alarmDurationOn, unsigned long alarmLowDurationOff, unsigned long alarmDurationOff){
@@ -83,7 +85,7 @@ void pumpSetAlarmDurations(pPumpInfo pump, unsigned long alarmDurationOn, unsign
   pump->alarmDurationOff = alarmDurationOff;
 }
 
-/*
+/**
  * Updates the pump, resets time counting for a period.
  * Sets duration of THIS period where pump was on to zero.
  */
@@ -95,7 +97,7 @@ unsigned long pumpResetPeriod(pPumpInfo pump){
   return pump->durationLastPeriod;
 }
 
-/*
+/**
  * Initialize a new pump. If pPumpInfo is null allocate memory for it.
  * Return initialized pPumpInfo (pointer to pumpInfo_t).
  */
@@ -128,7 +130,7 @@ pPumpInfo pumpInit(pPumpInfo pi, char *name, uint8_t pin, unsigned int alarmDura
   return pump;
 }
 
-/* 
+/**
  * A duration, i.e. how long the pump has
  * either been OFF (if it's OFF now) or ON (in case it's ON now)
 */
@@ -136,7 +138,7 @@ long pumpGetCurrentStateDuration(pPumpInfo pump){
   return (getSeconds() - pump->last);
 }
 
-/*
+/**
  * Return a string containing the alarm message, if any.
  */
 char *pumpGetAlarmMsg(pPumpInfo pump, char *msg, size_t len){
@@ -144,12 +146,11 @@ char *pumpGetAlarmMsg(pPumpInfo pump, char *msg, size_t len){
   Serial.print("pumpGetAlarmmsg "); Serial.println(pump->alarmCode);
 #endif
   if (pump->alarmCode == ALARM_DURATION_ON || pump->alarmCode == ALARM_DURATION_OFF){
-    char buf[11];
     snprintf(msg, len, 
 	     "ALARM:\nPump %s has been %s for %s\n",
 	     pump->name,
 	     ((pump->status == PUMPON)? "ON" : "OFF"),
-	     seconds2hhmmss(buf, pumpGetCurrentStateDuration(pump))
+	     seconds2hhmmss(buf1, pumpGetCurrentStateDuration(pump))
 	     );
   }else if (pump->alarmCode == ALARM_LOW_DURATION_OFF){
     snprintf(msg, len, 
@@ -170,13 +171,10 @@ char *pumpGetAlarmMsg(pPumpInfo pump, char *msg, size_t len){
 }
 
 
-/*
+/**
  * Build the status message which is returned when pump status is required
  */
 char *pumpGetStatusMsg(pPumpInfo pump, char *msg, size_t len){
-  char buf1[11];
-  char buf2[11];
-
   snprintf(msg, len, 
 	   "%s has been %s for %s\n" 
 	   " last on for %d sec\n"  
@@ -191,7 +189,7 @@ char *pumpGetStatusMsg(pPumpInfo pump, char *msg, size_t len){
 }
 
 
-/*
+/**
  * Builds a string with to send as NMEA sentence
  * Don't modify the string outside this file.
  */
@@ -223,7 +221,8 @@ char *pumpGetNMEA(int n, ...){
   return nmea;
 }
 
-/*
+/**
+ * Translate 'sec' seconds to a hh:mm:ss string
  * buf must be at least of size 10, 9 chars plus \0 
  */
 char *seconds2hhmmss(char *buf, long sec){
@@ -232,5 +231,5 @@ char *seconds2hhmmss(char *buf, long sec){
   int ss = sec - hh*3600-mm*60;
 
   snprintf(buf, 10, "%02dh%02dm%02ds", hh, mm, ss);
-  return hhmmss;
+  return buf;
 }

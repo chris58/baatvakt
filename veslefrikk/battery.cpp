@@ -5,7 +5,7 @@
 
 static char nmea[48];
 
-/*
+/**
  * Initialize a new battery structure
  * Return pointer to it
  */
@@ -28,7 +28,7 @@ pBatteryInfo batteryInit(pBatteryInfo bi, char *name, uint8_t pin, float convers
   return bat;
 }
 
-/*
+/**
  * Read new voltage and check whether there is an alarm
  * return the current alarm status
  */
@@ -50,7 +50,7 @@ int batteryUpdate(pBatteryInfo bat){
   return bat->alarmCode;
 }
 
-/*
+/**
  * Apply conversion factor to raw bit value and 
  * return voltage as float
  */
@@ -62,21 +62,21 @@ float batteryGetVoltage(pBatteryInfo bat){
   return bat->raw * bat->bit2voltConversion;
 }
 
-/*
+/**
  * Return voltage (float) as string
  */
 char* batteryGetVoltageAsString(pBatteryInfo bat, char *voltageS){
   return dtostrf(batteryGetVoltage(bat), 5, 2, voltageS);
 }
 
-/*
+/**
  * Quick and dirty guess...
  */
 int batteryIsCharging(pBatteryInfo bat){
   return (batteryGetVoltage(bat) >= (bat->lowAlarmVoltage + 1.5));
 }
 
-/*
+/**
  * Return a string containing the alarm message, if any.
  */
 char *batteryGetAlarmMsg(pBatteryInfo bat, char *msg, size_t len){
@@ -105,7 +105,7 @@ char *batteryGetAlarmMsg(pBatteryInfo bat, char *msg, size_t len){
   return msg;
 }
 
-/*
+/**
  * construct NMEA message for <n> pBatteryInfo s.
  * Returns a local string nmea. Don't mess with it outside this scope.
  */

@@ -11,7 +11,7 @@ static int probeCount = 0;
 static int maxProbe; // maximum number of temperature probes.
 static char nmea[128];
 
-/*
+/**
  * Allocate memory for an array of 'n' temperature devices. Init the DallasTemperature library
  */
 void temperatureInit(int n){
@@ -21,7 +21,7 @@ void temperatureInit(int n){
   maxProbe = n;
 }
 
-/*
+/**
  * Allocate a new structure, initialize it and return a pointer to it
  */
 pTemperatureInfo temperatureAddTemperatureProbe(DeviceAddress da, char *name, uint8_t alarmLow, uint8_t alarmHigh, uint8_t resolution){
@@ -49,7 +49,7 @@ pTemperatureInfo temperatureAddTemperatureProbe(DeviceAddress da, char *name, ui
   return ti; 
 }
 
-/*
+/**
  * Update temperatureInfo structures with current values
  */
 void temperaturesUpdate(){
@@ -67,7 +67,7 @@ void temperaturesUpdate(){
   } 
 }
 
-/*
+/**
  * Return a string containing the alarm message, if any.
  */
 char *temperatureGetAlarmMsg(pTemperatureInfo temp, char *msg, size_t len){
@@ -92,7 +92,7 @@ char *temperatureGetAlarmMsg(pTemperatureInfo temp, char *msg, size_t len){
   return msg;
 }
 
-/*
+/**
  * Returns in turn all pTemperatureInfos known
  * Call the first time with NULL
  * Next time with last returned pTemperatureInfo
@@ -114,7 +114,7 @@ pTemperatureInfo temperatureGetNextTempInfo(pTemperatureInfo last){
   return NULL;
 }
 
-/*
+/**
  * builds a string with all temperatures to send as NMEA sentence
  * Don't modify the string outside this file.
  */

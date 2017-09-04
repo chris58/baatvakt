@@ -122,7 +122,7 @@ pTemperatureInfo pTIcabin;
 pTemperatureInfo pTIengine;
 pTemperatureInfo pTIstern;
 pTemperatureInfo pTIout;
-DeviceAddress daBow    = { 0x28, 0x0A, 0xC5, 0x4F, 0x07, 0x00, 0x00, 0x21 }; 
+DeviceAddress daCabin    = { 0x28, 0x0A, 0xC5, 0x4F, 0x07, 0x00, 0x00, 0x21 }; 
 DeviceAddress daEngine = { 0x28, 0x57, 0x5A, 0x50, 0x07, 0x00, 0x00, 0x3F };
 DeviceAddress daStern    = { 0x28, 0xA2, 0x2B, 0x4B, 0x07, 0x00, 0x00, 0xAA }; 
 DeviceAddress daOut    = { 0x28, 0x91, 0xCF, 0x50, 0x07, 0x00, 0x00, 0x77 };
@@ -160,25 +160,25 @@ void setup(){
   //For http uses it's reccomanded to use 4800 or slower.
   gsm.begin(4800); // Serial3 in our case
 
-  /***************** conversion latin-1 to gsm *************
+  /* **************** conversion latin-1 to gsm *************
    *   http://www.developershome.com/sms/gsmAlphabet.asp
    ********************************************************/
 
   // temperatures
   temperatureInit(4); // init 
-  pTIcabin = temperatureAddTemperatureProbe(daBow, "Cabin", 0, 40, TEMP_9_BIT);
+  pTIcabin = temperatureAddTemperatureProbe(daCabin, "Cabin", 0, 40, TEMP_9_BIT);
   pTIengine = temperatureAddTemperatureProbe(daEngine, "Engine", 0, 50, TEMP_9_BIT);
   pTIstern = temperatureAddTemperatureProbe(daStern, "Stern", 0, 40, TEMP_9_BIT);
   pTIout = temperatureAddTemperatureProbe(daOut, "Outside", 0, 40, TEMP_9_BIT);
 
   // the pumps
   // More than 5 minutes ON, less than 1 minute OFF and more than 60 minutes OFF will give an alarm
-  unsigned long aon = 5L*60L;
-  unsigned long aLowoff = 60L;
-  unsigned long aoff = 60L*60L;
+  unsigned long aOn = 5L*60L;
+  unsigned long aLowOff = 60L;
+  unsigned long aHighOff = 60L*60L;
  
-  pPumpEngine = pumpInit(NULL, "Engine", PUMPENGINE_PIN, aon, aLowoff, aoff);
-  pPumpStern = pumpInit(NULL, "Stern", PUMPSTERN_PIN, aon, aLowoff, aoff);
+  pPumpEngine = pumpInit(NULL, "Engine", PUMPENGINE_PIN, aOn, aLowOff, aHighOff);
+  pPumpStern = pumpInit(NULL, "Stern", PUMPSTERN_PIN, aOn, aLowOff, aHighOff);
 
   // batteries
   pBattery12V = batteryInit(NULL, "12V Bat", BATTERY12V_PIN, (13.12/844.0), 12);
